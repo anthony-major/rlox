@@ -54,7 +54,7 @@ impl Scanner {
         let mut new_self = Self {
             source: source.chars().collect(),
             index: 0,
-            line: 0,
+            line: 1,
             current_char: None,
         };
 
