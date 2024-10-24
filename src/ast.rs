@@ -8,8 +8,8 @@ pub enum Expr {
 }
 
 pub struct Unary {
-    operator: Token,
-    right: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
 }
 
 impl Unary {
@@ -22,9 +22,9 @@ impl Unary {
 }
 
 pub struct Binary {
-    left: Box<Expr>,
-    operator: Token,
-    right: Box<Expr>,
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
 }
 
 impl Binary {
@@ -38,7 +38,7 @@ impl Binary {
 }
 
 pub struct Literal {
-    value: Token,
+    pub value: Token,
 }
 
 impl Literal {
@@ -50,7 +50,7 @@ impl Literal {
 }
 
 pub struct Grouping {
-    expression: Box<Expr>,
+    pub expression: Box<Expr>,
 }
 
 impl Grouping {
@@ -61,7 +61,7 @@ impl Grouping {
     }
 }
 
-pub trait ExprVisitor {
+pub trait Visitor {
     type Result;
 
     fn visit_unary(&self, unary: &Unary) -> Self::Result;
@@ -70,12 +70,12 @@ pub trait ExprVisitor {
     fn visit_grouping(&self, grouping: &Grouping) -> Self::Result;
 }
 
-pub trait AcceptExpr {
-    fn accept<V: ExprVisitor>(&self, visitor: &V) -> V::Result;
+pub trait Accept {
+    fn accept<V: Visitor>(&self, visitor: &V) -> V::Result;
 }
 
-impl AcceptExpr for Expr {
-    fn accept<V: ExprVisitor>(&self, visitor: &V) -> V::Result {
+impl Accept for Expr {
+    fn accept<V: Visitor>(&self, visitor: &V) -> V::Result {
         match self {
             Self::Unary(x) => visitor.visit_unary(x),
             Self::Binary(x) => visitor.visit_binary(x),

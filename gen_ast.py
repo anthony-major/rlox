@@ -35,7 +35,7 @@ for base in ast.keys():
         add_line(f"pub struct {name} {{")
         for field in fields:
             field_type, field_name = field.split()
-            add_line(f"\t{field_name}: {field_type},")
+            add_line(f"\tpub {field_name}: {field_type},")
         add_line("}")
 
         add_line("")
@@ -58,28 +58,32 @@ for base in ast.keys():
 
         add_line("")
 
-    # Create Visitor
-    add_line(f"pub trait {base}Visitor {{")
-    add_line("\ttype Result;")
-    add_line("")
+# Create Visitor
+add_line("pub trait Visitor {")
+add_line("\ttype Result;")
+add_line("")
+for base in ast.keys():
+    nodes = ast[base]
     for node in nodes:
         name = node.split(":")[0]
         add_line(f"\tfn visit_{name.lower()}(&self, {name.lower()}: &{name}) -> Self::Result;")
-    add_line("}")
+add_line("}")
 
-    add_line("")
+add_line("")
 
-    # Create Accept for Visitor
-    add_line(f"pub trait Accept{base} {{")
-    add_line(f"\tfn accept<V: {base}Visitor>(&self, visitor: &V) -> V::Result;")
-    add_line("}")
+# Create Accept for Visitor
+add_line("pub trait Accept {")
+add_line("\tfn accept<V: Visitor>(&self, visitor: &V) -> V::Result;")
+add_line("}")
 
-    add_line("")
+add_line("")
 
-    # Impl Accept
-    add_line(f"impl Accept{base} for {base} {{")
-    add_line(f"\tfn accept<V: {base}Visitor>(&self, visitor: &V) -> V::Result {{")
+# Impl Accept
+for base in ast.keys():
+    add_line(f"impl Accept for {base} {{")
+    add_line("\tfn accept<V: Visitor>(&self, visitor: &V) -> V::Result {")
     add_line("\t\tmatch self {")
+    nodes = ast[base]
     for node in nodes:
         name = node.split(":")[0]
         add_line(f"\t\t\tSelf::{name}(x) => visitor.visit_{name.lower()}(x),")
