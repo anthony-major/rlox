@@ -12,22 +12,19 @@ mod scanner;
 mod token;
 
 fn main() {
-    let expression = Expr::Binary(Box::new(Binary::new(
-        Box::new(Expr::Unary(Box::new(Unary::new(
+    let expression = Expr::Binary(Binary::new(
+        Box::new(Expr::Unary(Unary::new(
             Token::new(TokenKind::Minus, 1),
-            Box::new(Expr::Literal(Box::new(Literal::new(Token::new(
+            Box::new(Expr::Literal(Literal::new(Token::new(
                 TokenKind::Number(123.0),
                 1,
-            ))))),
-        )))),
-        Token::new(TokenKind::Star, 1),
-        Box::new(Expr::Grouping(Box::new(Grouping::new(Box::new(
-            Expr::Literal(Box::new(Literal::new(Token::new(
-                TokenKind::Number(45.67),
-                1,
             )))),
+        ))),
+        Token::new(TokenKind::Star, 1),
+        Box::new(Expr::Grouping(Grouping::new(Box::new(Expr::Literal(
+            Literal::new(Token::new(TokenKind::Number(45.67), 1)),
         ))))),
-    )));
+    ));
 
     let printer = AstPrinter::default();
 

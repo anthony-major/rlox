@@ -1,10 +1,10 @@
 use crate::token::Token;
 
 pub enum Expr {
-    Unary(Box<Unary>),
-    Binary(Box<Binary>),
-    Literal(Box<Literal>),
-    Grouping(Box<Grouping>),
+    Unary(Unary),
+    Binary(Binary),
+    Literal(Literal),
+    Grouping(Grouping),
 }
 
 pub struct Unary {

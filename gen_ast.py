@@ -22,7 +22,7 @@ for base in ast.keys():
     add_line(f"pub enum {base} {{")
     for node in nodes:
         name = node.split(":")[0]
-        add_line(f"\t{name}(Box<{name}>),")
+        add_line(f"\t{name}({name}),")
     add_line("}")
 
     add_line("")
@@ -55,7 +55,7 @@ for base in ast.keys():
         add_line("\t\t}")
         add_line("\t}")
         add_line("}")
-
+        
         add_line("")
 
 # Create Visitor
