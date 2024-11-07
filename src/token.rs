@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     kind: TokenKind,
     line: usize,

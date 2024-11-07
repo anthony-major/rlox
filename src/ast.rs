@@ -43,9 +43,7 @@ pub struct Literal {
 
 impl Literal {
     pub fn new(value: Token) -> Self {
-        Self {
-            value: value,
-        }
+        Self { value: value }
     }
 }
 
