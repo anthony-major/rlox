@@ -4,21 +4,17 @@ use crate::token::{Token, TokenKind};
 
 #[derive(Debug)]
 pub struct ScannerError {
-    kind: ScannerErrorKind,
     line: usize,
-}
-
-#[derive(Debug)]
-pub enum ScannerErrorKind {
-    InvalidCharacter(char),
-    UnterminatedString,
+    character: Option<char>,
+    message: String,
 }
 
 impl ScannerError {
-    pub fn new(kind: ScannerErrorKind, line: usize) -> Self {
+    pub fn new(line: usize, character: Option<char>, message: String) -> Self {
         Self {
-            kind: kind,
-            line: line,
+            line,
+            character,
+            message,
         }
     }
 }
@@ -27,18 +23,11 @@ impl Error for ScannerError {}
 
 impl Display for ScannerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
-            ScannerErrorKind::InvalidCharacter(c) => {
-                write!(
-                    f,
-                    "Invalid character found while scanning at line {}: {}",
-                    self.line, c
-                )
-            }
-            ScannerErrorKind::UnterminatedString => {
-                write!(f, "Encountered unterminated string at line {}", self.line)
-            }
+        write!(f, "Line {}", self.line)?;
+        if let Some(c) = self.character {
+            write!(f, " at '{}'", c)?;
         }
+        write!(f, ": {}", self.message)
     }
 }
 
@@ -186,8 +175,9 @@ impl Scanner {
                 let invalid_char = self.current_char.unwrap();
                 self.get_next_character();
                 Err(ScannerError::new(
-                    ScannerErrorKind::InvalidCharacter(invalid_char),
                     self.line,
+                    Some(invalid_char),
+                    "Unexpected character".to_string(),
                 ))
             }
         }
@@ -231,8 +221,9 @@ impl Scanner {
 
         if self.current_char.is_none() {
             return Err(ScannerError::new(
-                ScannerErrorKind::UnterminatedString,
                 self.line,
+                None,
+                "Unterminated string".to_string(),
             ));
         }
 

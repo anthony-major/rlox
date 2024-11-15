@@ -26,7 +26,7 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_literal(&self, literal: &crate::ast::Literal) -> Self::Result {
-        print!("{}", literal.value.kind());
+        print!("{} ", literal.value.kind());
     }
 
     fn visit_grouping(&self, grouping: &crate::ast::Grouping) -> Self::Result {

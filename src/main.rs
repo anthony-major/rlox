@@ -3,6 +3,8 @@ use std::process::ExitCode;
 use ast::{Binary, Expr, Grouping, Literal, Unary};
 use ast_printer::AstPrinter;
 use interpreter::Interpreter;
+use parser::Parser;
+use scanner::Scanner;
 use token::{Token, TokenKind};
 
 mod ast;
@@ -11,26 +13,6 @@ mod interpreter;
 mod parser;
 mod scanner;
 mod token;
-
-fn main() {
-    let expression = Expr::Binary(Binary::new(
-        Box::new(Expr::Unary(Unary::new(
-            Token::new(TokenKind::Minus, 1),
-            Box::new(Expr::Literal(Literal::new(Token::new(
-                TokenKind::Number(123.0),
-                1,
-            )))),
-        ))),
-        Token::new(TokenKind::Star, 1),
-        Box::new(Expr::Grouping(Grouping::new(Box::new(Expr::Literal(
-            Literal::new(Token::new(TokenKind::Number(45.67), 1)),
-        ))))),
-    ));
-
-    let printer = AstPrinter::default();
-
-    printer.print(expression);
-}
 
 // fn main() -> ExitCode {
 //     let args = std::env::args().collect::<Vec<String>>();
@@ -56,3 +38,45 @@ fn main() {
 //         }
 //     }
 // }
+
+// fn main() {
+//     let expression = Expr::Binary(Binary::new(
+//         Box::new(Expr::Unary(Unary::new(
+//             Token::new(TokenKind::Minus, 1),
+//             Box::new(Expr::Literal(Literal::new(Token::new(
+//                 TokenKind::Number(123.0),
+//                 1,
+//             )))),
+//         ))),
+//         Token::new(TokenKind::Star, 1),
+//         Box::new(Expr::Grouping(Grouping::new(Box::new(Expr::Literal(
+//             Literal::new(Token::new(TokenKind::Number(45.67), 1)),
+//         ))))),
+//     ));
+
+//     let printer = AstPrinter::default();
+
+//     printer.print(expression);
+// }
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() < 2 {
+        return;
+    }
+
+    let scanner = Scanner::new(args[1].as_str());
+    let mut parser = Parser::new(scanner);
+
+    let expression = parser.parse();
+
+    match expression {
+        Ok(expr) => {
+            let ast_printer = AstPrinter::default();
+
+            ast_printer.print(expr);
+        }
+        Err(err) => println!("{}", err),
+    }
+}
