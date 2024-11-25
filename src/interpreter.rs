@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display, io::Write};
 use crate::{
     ast::{Accept, Visitor},
     scanner::{Scanner, ScannerError},
-    token::TokenKind,
+    token::{Token, TokenKind},
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,7 +25,16 @@ impl LoxValue {
 }
 
 #[derive(Debug)]
-pub struct RuntimeError {}
+pub struct RuntimeError {
+    token: Token,
+    message: String,
+}
+
+impl RuntimeError {
+    pub fn new(token: Token, message: String) -> Self {
+        Self { token, message }
+    }
+}
 
 impl Error for RuntimeError {}
 
@@ -100,7 +109,10 @@ impl Visitor for Interpreter {
             TokenKind::False => Ok(LoxValue::Boolean(false)),
             TokenKind::Number(x) => Ok(LoxValue::Number(x.clone())),
             TokenKind::String(s) => Ok(LoxValue::String(s.clone())),
-            _ => Err(RuntimeError {}),
+            _ => Err(RuntimeError::new(
+                literal.value.clone(),
+                "Expected literal".to_string(),
+            )),
         }
     }
 
@@ -114,10 +126,16 @@ impl Visitor for Interpreter {
         match unary.operator.kind() {
             TokenKind::Minus => match right {
                 LoxValue::Number(x) => Ok(LoxValue::Number(-x)),
-                _ => Err(RuntimeError {}),
+                _ => Err(RuntimeError::new(
+                    unary.operator.clone(),
+                    "Expected number".to_string(),
+                )),
             },
             TokenKind::Bang => Ok(LoxValue::Boolean(!right.is_truthy())),
-            _ => Err(RuntimeError {}),
+            _ => Err(RuntimeError::new(
+                unary.operator.clone(),
+                "Expected unary operator".to_string(),
+            )),
         }
     }
 
