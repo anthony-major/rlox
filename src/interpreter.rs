@@ -1,8 +1,7 @@
-use std::{error::Error, fmt::Display, io::Write};
+use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Accept, Visitor},
-    scanner::{Scanner, ScannerError},
+    ast::{Accept, Expr, Visitor},
     token::{Token, TokenKind},
 };
 
@@ -24,6 +23,17 @@ impl LoxValue {
     }
 }
 
+impl Display for LoxValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Nil => write!(f, "nil"),
+            Self::Boolean(b) => write!(f, "{}", b),
+            Self::String(s) => write!(f, "{}", s),
+            Self::Number(x) => write!(f, "{}", x.to_string().trim_end_matches(".0")),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RuntimeError {
     token: Token,
@@ -40,62 +50,24 @@ impl Error for RuntimeError {}
 
 impl Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
+        write!(
+            f,
+            "Line {} at '{}': {}",
+            self.token.line(),
+            self.token.kind(),
+            self.message
+        )
     }
 }
 
+#[derive(Default)]
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn run_file(path: &str) -> std::io::Result<()> {
-        let interpreter = Self {};
-        let code = std::fs::read_to_string(path)?;
-
-        interpreter.run(&code);
-
-        Ok(())
-    }
-
-    pub fn run_prompt() -> std::io::Result<()> {
-        let interpreter = Self {};
-        let mut input = String::new();
-
-        loop {
-            print!(">");
-            std::io::stdout().flush()?;
-            let bytes_read = std::io::stdin().read_line(&mut input)?;
-            if bytes_read == 0 {
-                break;
-            }
-
-            interpreter.run(&input);
-
-            input.clear();
-        }
-
-        Ok(())
-    }
-
-    fn run(&self, source: &str) {
-        let mut scanner = Scanner::new(source);
-        let mut errors: Vec<ScannerError> = Vec::new();
-
-        loop {
-            match scanner.get_next_token() {
-                Ok(token) => {
-                    println!("{}", token);
-
-                    if token.kind() == &TokenKind::Eof {
-                        break;
-                    }
-                }
-                Err(err) => errors.push(err),
-            }
-        }
-
-        for err in errors {
-            println!("{}", err);
-        }
+    pub fn interpret(&self, expression: Expr) -> Result<LoxValue, Box<dyn Error>> {
+        expression
+            .accept(self)
+            .map_err(|e| Box::new(e) as Box<dyn Error>)
     }
 }
 
