@@ -99,6 +99,21 @@ impl Interpreter {
     }
 }
 
+fn evaluate_number_operands<F: Fn(f64, f64) -> LoxValue>(
+    operator: Token,
+    left: LoxValue,
+    right: LoxValue,
+    operation: F,
+) -> Result<LoxValue, RuntimeError> {
+    match (left, right) {
+        (LoxValue::Number(x), LoxValue::Number(y)) => Ok(operation(x, y)),
+        _ => Err(RuntimeError::new(
+            operator,
+            "Expected two numbers for binary operator".to_string(),
+        )),
+    }
+}
+
 impl Visitor for Interpreter {
     type Result = Result<LoxValue, RuntimeError>;
 
@@ -128,7 +143,7 @@ impl Visitor for Interpreter {
                 LoxValue::Number(x) => Ok(LoxValue::Number(-x)),
                 _ => Err(RuntimeError::new(
                     unary.operator.clone(),
-                    "Expected number".to_string(),
+                    "Expected number after unary operator".to_string(),
                 )),
             },
             TokenKind::Bang => Ok(LoxValue::Boolean(!right.is_truthy())),
@@ -144,42 +159,55 @@ impl Visitor for Interpreter {
         let right = binary.right.accept(self)?;
 
         match binary.operator.kind() {
-            TokenKind::Minus => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Number(x - y)),
-                _ => Err(RuntimeError {}),
-            },
-            TokenKind::Slash => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Number(x / y)),
-                _ => Err(RuntimeError {}),
-            },
-            TokenKind::Star => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Number(x * y)),
-                _ => Err(RuntimeError {}),
-            },
+            TokenKind::Minus => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Number(x + y)
+                })
+            }
+            TokenKind::Slash => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Number(x / y)
+                })
+            }
+            TokenKind::Star => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Number(x * y)
+                })
+            }
             TokenKind::Plus => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Number(x / y)),
+                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Number(x + y)),
                 (LoxValue::String(x), LoxValue::String(y)) => Ok(LoxValue::String(x + &y)),
-                _ => Err(RuntimeError {}),
+                _ => Err(RuntimeError::new(
+                    binary.operator.clone(),
+                    "Expected two numbers or two strings".to_string(),
+                )),
             },
-            TokenKind::Greater => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Boolean(x > y)),
-                _ => Err(RuntimeError {}),
-            },
-            TokenKind::GreaterEqual => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Boolean(x >= y)),
-                _ => Err(RuntimeError {}),
-            },
-            TokenKind::Less => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Boolean(x < y)),
-                _ => Err(RuntimeError {}),
-            },
-            TokenKind::LessEqual => match (left, right) {
-                (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Boolean(x <= y)),
-                _ => Err(RuntimeError {}),
-            },
+            TokenKind::Greater => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Boolean(x > y)
+                })
+            }
+            TokenKind::GreaterEqual => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Boolean(x >= y)
+                })
+            }
+            TokenKind::Less => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Boolean(x < y)
+                })
+            }
+            TokenKind::LessEqual => {
+                evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
+                    LoxValue::Boolean(x <= y)
+                })
+            }
             TokenKind::BangEqual => Ok(LoxValue::Boolean(left != right)),
             TokenKind::EqualEqual => Ok(LoxValue::Boolean(left == right)),
-            _ => Err(RuntimeError {}),
+            _ => Err(RuntimeError::new(
+                binary.operator.clone(),
+                "Expected binary operator".to_string(),
+            )),
         }
     }
 }
