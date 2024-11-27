@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Expr, ExprAccept, ExprVisitor},
+    ast::{Expr, ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
     token::{Token, TokenKind},
 };
 
@@ -64,10 +64,12 @@ impl Display for RuntimeError {
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn interpret(&self, expression: Expr) -> Result<LoxValue, Box<dyn Error>> {
-        expression
-            .accept(self)
-            .map_err(|e| Box::new(e) as Box<dyn Error>)
+    pub fn interpret(&self, statements: Vec<Stmt>) -> Result<(), Box<dyn Error>> {
+        for statement in statements {
+            statement.accept(self)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -181,5 +183,21 @@ impl ExprVisitor for Interpreter {
                 "Expected binary operator".to_string(),
             )),
         }
+    }
+}
+
+impl StmtVisitor for Interpreter {
+    type Result = Result<(), RuntimeError>;
+
+    fn visit_expression(&self, expression: &crate::ast::Expression) -> Self::Result {
+        expression.expression.accept(self).map(|_| {})
+    }
+
+    fn visit_print(&self, print: &crate::ast::Print) -> Self::Result {
+        let value = print.expression.accept(self)?;
+
+        println!("{}", value);
+
+        Ok(())
     }
 }

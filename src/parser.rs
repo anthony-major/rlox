@@ -1,12 +1,12 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Binary, Expr, Grouping, Literal, Unary},
+    ast::{Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary},
     scanner::Scanner,
     token::{Token, TokenKind},
 };
 
-pub type ParserResult = Result<Expr, Box<dyn Error>>;
+pub type ParserResult<T> = Result<T, Box<dyn Error>>;
 
 #[derive(Debug)]
 pub struct ParserError {
@@ -47,17 +47,63 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> ParserResult {
+    pub fn parse(&mut self) -> ParserResult<Vec<Stmt>> {
         self.current_token = self.scanner.get_next_token()?;
 
-        self.expression()
+        let mut statements: Vec<Stmt> = Vec::new();
+
+        while self.current_token.kind() != &TokenKind::Eof {
+            statements.push(self.statement()?);
+        }
+
+        Ok(statements)
     }
 
-    fn expression(&mut self) -> ParserResult {
+    fn statement(&mut self) -> ParserResult<Stmt> {
+        if matches!(self.current_token.kind(), TokenKind::Print) {
+            self.current_token = self.scanner.get_next_token()?;
+
+            return self.printStatement();
+        }
+
+        self.expressionStatement()
+    }
+
+    fn printStatement(&mut self) -> ParserResult<Stmt> {
+        let value = self.expression()?;
+
+        match self.current_token.kind() {
+            TokenKind::Semicolon => {
+                self.current_token = self.scanner.get_next_token()?;
+                Ok(Stmt::Print(Print::new(value)))
+            }
+            _ => Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ';' after value".to_string(),
+            ))),
+        }
+    }
+
+    fn expressionStatement(&mut self) -> ParserResult<Stmt> {
+        let expr = self.expression()?;
+
+        match self.current_token.kind() {
+            TokenKind::Semicolon => {
+                self.current_token = self.scanner.get_next_token()?;
+                Ok(Stmt::Expression(Expression::new(expr)))
+            }
+            _ => Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ';' after expression".to_string(),
+            ))),
+        }
+    }
+
+    fn expression(&mut self) -> ParserResult<Expr> {
         self.equality()
     }
 
-    fn equality(&mut self) -> ParserResult {
+    fn equality(&mut self) -> ParserResult<Expr> {
         let mut expr = self.comparison()?;
 
         while matches!(
@@ -73,7 +119,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> ParserResult {
+    fn comparison(&mut self) -> ParserResult<Expr> {
         let mut expr = self.term()?;
 
         while matches!(
@@ -89,7 +135,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&mut self) -> ParserResult {
+    fn term(&mut self) -> ParserResult<Expr> {
         let mut expr = self.factor()?;
 
         while matches!(
@@ -105,7 +151,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> ParserResult {
+    fn factor(&mut self) -> ParserResult<Expr> {
         let mut expr = self.unary()?;
 
         while matches!(
@@ -121,7 +167,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> ParserResult {
+    fn unary(&mut self) -> ParserResult<Expr> {
         if matches!(
             self.current_token.kind(),
             TokenKind::Bang | TokenKind::Minus
@@ -135,7 +181,7 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&mut self) -> ParserResult {
+    fn primary(&mut self) -> ParserResult<Expr> {
         match self.current_token.kind() {
             TokenKind::True
             | TokenKind::False

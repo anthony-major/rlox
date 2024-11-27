@@ -1,20 +1,4 @@
-class Test {
-    var field = 1.123;
-
-    method(param) {
-        print param;
-    }
-}
-
-@#
-
-fun main() {
-    var a = 1;
-    var b = 1;
-
-    var c = -a - -b * 2;
-
-    print c;
-
-    return
-}
+print "one";
+print true;
+print 2 + 1;
+1+1; // This should not print

@@ -1,18 +1,11 @@
-use std::{
-    error::Error,
-    io::{stdin, stdout, Result, Write},
-};
+use std::io::{stdin, stdout, Result, Write};
 
-use crate::{
-    interpreter::Interpreter,
-    parser::Parser,
-    scanner::{Scanner, ScannerError},
-};
+use crate::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
 #[derive(Default)]
 pub struct Lox {
     interpreter: Interpreter,
-    errors: Vec<Box<dyn Error>>,
+    // errors: Vec<Box<dyn Error>>,
 }
 
 impl Lox {
@@ -42,18 +35,18 @@ impl Lox {
         Ok(())
     }
 
-    pub fn error(&mut self, err: Box<dyn Error>) {
-        self.errors.push(err);
-    }
+    // pub fn error(&mut self, err: Box<dyn Error>) {
+    //     self.errors.push(err);
+    // }
 
     fn run(&self, source: &str) {
-        let mut scanner = Scanner::new(source);
+        let scanner = Scanner::new(source);
         let mut parser = Parser::new(scanner);
-        let mut errors: Vec<Box<dyn Error>> = Vec::new();
+        // let mut errors: Vec<Box<dyn Error>> = Vec::new();
 
         match parser.parse() {
-            Ok(expression) => match self.interpreter.interpret(expression) {
-                Ok(value) => println!("{}", value),
+            Ok(statements) => match self.interpreter.interpret(statements) {
+                Ok(_) => {}
                 Err(err) => println!("{}", err),
             },
             Err(err) => println!("{}", err),
