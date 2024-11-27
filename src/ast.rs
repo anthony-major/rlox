@@ -59,7 +59,7 @@ impl Grouping {
     }
 }
 
-pub trait Visitor {
+pub trait ExprVisitor {
     type Result;
 
     fn visit_unary(&self, unary: &Unary) -> Self::Result;
@@ -68,17 +68,65 @@ pub trait Visitor {
     fn visit_grouping(&self, grouping: &Grouping) -> Self::Result;
 }
 
-pub trait Accept {
-    fn accept<V: Visitor>(&self, visitor: &V) -> V::Result;
+pub trait ExprAccept {
+    fn accept<V: ExprVisitor>(&self, visitor: &V) -> V::Result;
 }
 
-impl Accept for Expr {
-    fn accept<V: Visitor>(&self, visitor: &V) -> V::Result {
+impl ExprAccept for Expr {
+    fn accept<V: ExprVisitor>(&self, visitor: &V) -> V::Result {
         match self {
             Self::Unary(x) => visitor.visit_unary(x),
             Self::Binary(x) => visitor.visit_binary(x),
             Self::Literal(x) => visitor.visit_literal(x),
             Self::Grouping(x) => visitor.visit_grouping(x),
+        }
+    }
+}
+pub enum Stmt {
+    Expression(Expression),
+    Print(Print),
+}
+
+pub struct Expression {
+    pub expression: Expr,
+}
+
+impl Expression {
+    pub fn new(expression: Expr) -> Self {
+        Self {
+            expression: expression,
+        }
+    }
+}
+
+pub struct Print {
+    pub expression: Expr,
+}
+
+impl Print {
+    pub fn new(expression: Expr) -> Self {
+        Self {
+            expression: expression,
+        }
+    }
+}
+
+pub trait StmtVisitor {
+    type Result;
+
+    fn visit_expression(&self, expression: &Expression) -> Self::Result;
+    fn visit_print(&self, print: &Print) -> Self::Result;
+}
+
+pub trait StmtAccept {
+    fn accept<V: StmtVisitor>(&self, visitor: &V) -> V::Result;
+}
+
+impl StmtAccept for Stmt {
+    fn accept<V: StmtVisitor>(&self, visitor: &V) -> V::Result {
+        match self {
+            Self::Expression(x) => visitor.visit_expression(x),
+            Self::Print(x) => visitor.visit_print(x),
         }
     }
 }

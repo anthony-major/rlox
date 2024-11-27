@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Accept, Expr, Visitor},
+    ast::{Expr, ExprAccept, ExprVisitor},
     token::{Token, TokenKind},
 };
 
@@ -86,7 +86,7 @@ fn evaluate_number_operands<F: Fn(f64, f64) -> LoxValue>(
     }
 }
 
-impl Visitor for Interpreter {
+impl ExprVisitor for Interpreter {
     type Result = Result<LoxValue, RuntimeError>;
 
     fn visit_literal(&self, literal: &crate::ast::Literal) -> Self::Result {
@@ -133,7 +133,7 @@ impl Visitor for Interpreter {
         match binary.operator.kind() {
             TokenKind::Minus => {
                 evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
-                    LoxValue::Number(x + y)
+                    LoxValue::Number(x - y)
                 })
             }
             TokenKind::Slash => {

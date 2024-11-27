@@ -1,4 +1,4 @@
-use crate::ast::{Accept, Expr, Visitor};
+use crate::ast::{Expr, ExprAccept, ExprVisitor};
 
 #[derive(Default)]
 pub struct AstPrinter {}
@@ -9,7 +9,7 @@ impl AstPrinter {
     }
 }
 
-impl Visitor for AstPrinter {
+impl ExprVisitor for AstPrinter {
     type Result = ();
 
     fn visit_unary(&self, unary: &crate::ast::Unary) -> Self::Result {

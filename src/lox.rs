@@ -5,12 +5,14 @@ use std::{
 
 use crate::{
     interpreter::Interpreter,
+    parser::Parser,
     scanner::{Scanner, ScannerError},
 };
 
 #[derive(Default)]
 pub struct Lox {
     interpreter: Interpreter,
+    errors: Vec<Box<dyn Error>>,
 }
 
 impl Lox {
@@ -40,25 +42,21 @@ impl Lox {
         Ok(())
     }
 
+    pub fn error(&mut self, err: Box<dyn Error>) {
+        self.errors.push(err);
+    }
+
     fn run(&self, source: &str) {
         let mut scanner = Scanner::new(source);
+        let mut parser = Parser::new(scanner);
         let mut errors: Vec<Box<dyn Error>> = Vec::new();
 
-        loop {
-            match scanner.get_next_token() {
-                Ok(token) => {
-                    println!("{}", token);
-
-                    if token.kind() == &TokenKind::Eof {
-                        break;
-                    }
-                }
-                Err(err) => errors.push(err),
-            }
-        }
-
-        for err in errors {
-            println!("{}", err);
+        match parser.parse() {
+            Ok(expression) => match self.interpreter.interpret(expression) {
+                Ok(value) => println!("{}", value),
+                Err(err) => println!("{}", err),
+            },
+            Err(err) => println!("{}", err),
         }
     }
 }
