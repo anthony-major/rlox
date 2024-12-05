@@ -2,6 +2,7 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{Expr, ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
+    environment::Environment,
     token::{Token, TokenKind},
 };
 
@@ -61,10 +62,12 @@ impl Display for RuntimeError {
 }
 
 #[derive(Default)]
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
-    pub fn interpret(&self, statements: Vec<Stmt>) -> Result<(), Box<dyn Error>> {
+    pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), Box<dyn Error>> {
         for statement in statements {
             statement.accept(self)?;
         }
@@ -91,7 +94,7 @@ fn evaluate_number_operands<F: Fn(f64, f64) -> LoxValue>(
 impl ExprVisitor for Interpreter {
     type Result = Result<LoxValue, RuntimeError>;
 
-    fn visit_literal(&self, literal: &crate::ast::Literal) -> Self::Result {
+    fn visit_literal(&mut self, literal: &crate::ast::Literal) -> Self::Result {
         match literal.value.kind() {
             TokenKind::Nil => Ok(LoxValue::Nil),
             TokenKind::True => Ok(LoxValue::Boolean(true)),
@@ -105,11 +108,11 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_grouping(&self, grouping: &crate::ast::Grouping) -> Self::Result {
+    fn visit_grouping(&mut self, grouping: &crate::ast::Grouping) -> Self::Result {
         grouping.expression.accept(self)
     }
 
-    fn visit_unary(&self, unary: &crate::ast::Unary) -> Self::Result {
+    fn visit_unary(&mut self, unary: &crate::ast::Unary) -> Self::Result {
         let right = unary.right.accept(self)?;
 
         match unary.operator.kind() {
@@ -128,7 +131,7 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_binary(&self, binary: &crate::ast::Binary) -> Self::Result {
+    fn visit_binary(&mut self, binary: &crate::ast::Binary) -> Self::Result {
         let left = binary.left.accept(self)?;
         let right = binary.right.accept(self)?;
 
@@ -184,20 +187,45 @@ impl ExprVisitor for Interpreter {
             )),
         }
     }
+
+    fn visit_variable(&mut self, variable: &crate::ast::Variable) -> Self::Result {
+        match self.environment.get(&variable.name) {
+            Ok(value) => Ok(value.clone()),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 impl StmtVisitor for Interpreter {
     type Result = Result<(), RuntimeError>;
 
-    fn visit_expression(&self, expression: &crate::ast::Expression) -> Self::Result {
+    fn visit_expression(&mut self, expression: &crate::ast::Expression) -> Self::Result {
         expression.expression.accept(self).map(|_| {})
     }
 
-    fn visit_print(&self, print: &crate::ast::Print) -> Self::Result {
+    fn visit_print(&mut self, print: &crate::ast::Print) -> Self::Result {
         let value = print.expression.accept(self)?;
 
         println!("{}", value);
 
         Ok(())
+    }
+
+    fn visit_var(&mut self, var: &crate::ast::Var) -> Self::Result {
+        let value = match &var.initializer {
+            Some(expr) => expr.accept(self)?,
+            None => LoxValue::Nil,
+        };
+
+        match var.name.kind() {
+            TokenKind::Identifier(id) => {
+                self.environment.define(id.clone(), value);
+                Ok(())
+            }
+            _ => Err(RuntimeError::new(
+                var.name.clone(),
+                "Expected identifier".to_string(),
+            )),
+        }
     }
 }

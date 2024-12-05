@@ -9,7 +9,7 @@ pub struct Lox {
 }
 
 impl Lox {
-    pub fn run_file(&self, path: &str) -> Result<()> {
+    pub fn run_file(&mut self, path: &str) -> Result<()> {
         let code = std::fs::read_to_string(path)?;
 
         self.run(&code);
@@ -17,7 +17,7 @@ impl Lox {
         Ok(())
     }
 
-    pub fn run_prompt(&self) -> Result<()> {
+    pub fn run_prompt(&mut self) -> Result<()> {
         let mut input = String::new();
 
         loop {
@@ -29,7 +29,7 @@ impl Lox {
                 break;
             }
 
-            self.run(&input);
+            self.run(&input.trim_end());
         }
 
         Ok(())
@@ -39,7 +39,7 @@ impl Lox {
     //     self.errors.push(err);
     // }
 
-    fn run(&self, source: &str) {
+    fn run(&mut self, source: &str) {
         let scanner = Scanner::new(source);
         let mut parser = Parser::new(scanner);
         // let mut errors: Vec<Box<dyn Error>> = Vec::new();

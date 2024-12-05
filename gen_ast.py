@@ -4,10 +4,12 @@ ast = {
         "Binary: Box<Expr> left, Token operator, Box<Expr> right",
         "Literal: Token value",
         "Grouping: Box<Expr> expression",
+        "Variable: Token name",
     ],
     "Stmt": [
-        "Expression: Expr expression",
-        "Print: Expr expression",
+        "Expression: Box<Expr> expression",
+        "Print: Box<Expr> expression",
+        "Var: Token name, Option<Box<Expr>> initializer",
     ]
 }
 
@@ -68,21 +70,21 @@ for base in ast.keys():
     add_line("")
     for node in nodes:
         name = node.split(":")[0]
-        add_line(f"\tfn visit_{name.lower()}(&self, {name.lower()}: &{name}) -> Self::Result;")
+        add_line(f"\tfn visit_{name.lower()}(&mut self, {name.lower()}: &{name}) -> Self::Result;")
     add_line("}")
 
     add_line("")
 
     # Create Accept for Visitor
     add_line(f"pub trait {base}Accept {{")
-    add_line(f"\tfn accept<V: {base}Visitor>(&self, visitor: &V) -> V::Result;")
+    add_line(f"\tfn accept<V: {base}Visitor>(&self, visitor: &mut V) -> V::Result;")
     add_line("}")
 
     add_line("")
 
     # Impl Accept
     add_line(f"impl {base}Accept for {base} {{")
-    add_line(f"\tfn accept<V: {base}Visitor>(&self, visitor: &V) -> V::Result {{")
+    add_line(f"\tfn accept<V: {base}Visitor>(&self, visitor: &mut V) -> V::Result {{")
     add_line("\t\tmatch self {")
     nodes = ast[base]
     for node in nodes:

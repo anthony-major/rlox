@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary},
+    ast::{Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var, Variable},
     scanner::Scanner,
     token::{Token, TokenKind},
 };
@@ -53,29 +53,74 @@ impl Parser {
         let mut statements: Vec<Stmt> = Vec::new();
 
         while self.current_token.kind() != &TokenKind::Eof {
-            statements.push(self.statement()?);
+            statements.push(self.declaration()?);
         }
 
         Ok(statements)
+    }
+
+    fn declaration(&mut self) -> ParserResult<Stmt> {
+        if matches!(self.current_token.kind(), TokenKind::Var) {
+            self.current_token = self.scanner.get_next_token()?;
+
+            return self.var_declaration();
+        }
+
+        self.statement()
+    }
+
+    fn var_declaration(&mut self) -> ParserResult<Stmt> {
+        let name = match self.current_token.kind() {
+            TokenKind::Identifier(_) => {
+                let temp = self.current_token.clone();
+                self.current_token = self.scanner.get_next_token()?;
+                temp
+            }
+            _ => {
+                return Err(Box::new(ParserError::new(
+                    self.current_token.clone(),
+                    "Expected variable name".to_string(),
+                )))
+            }
+        };
+
+        let initializer = match self.current_token.kind() {
+            TokenKind::Equal => {
+                self.current_token = self.scanner.get_next_token()?;
+                Some(Box::new(self.expression()?))
+            }
+            _ => None,
+        };
+
+        match self.current_token.kind() {
+            TokenKind::Semicolon => {
+                self.current_token = self.scanner.get_next_token()?;
+                Ok(Stmt::Var(Var::new(name, initializer)))
+            }
+            _ => Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expected ';' after variable declaration".to_string(),
+            ))),
+        }
     }
 
     fn statement(&mut self) -> ParserResult<Stmt> {
         if matches!(self.current_token.kind(), TokenKind::Print) {
             self.current_token = self.scanner.get_next_token()?;
 
-            return self.printStatement();
+            return self.print_statement();
         }
 
-        self.expressionStatement()
+        self.expression_statement()
     }
 
-    fn printStatement(&mut self) -> ParserResult<Stmt> {
+    fn print_statement(&mut self) -> ParserResult<Stmt> {
         let value = self.expression()?;
 
         match self.current_token.kind() {
             TokenKind::Semicolon => {
                 self.current_token = self.scanner.get_next_token()?;
-                Ok(Stmt::Print(Print::new(value)))
+                Ok(Stmt::Print(Print::new(Box::new(value))))
             }
             _ => Err(Box::new(ParserError::new(
                 self.current_token.clone(),
@@ -84,13 +129,13 @@ impl Parser {
         }
     }
 
-    fn expressionStatement(&mut self) -> ParserResult<Stmt> {
+    fn expression_statement(&mut self) -> ParserResult<Stmt> {
         let expr = self.expression()?;
 
         match self.current_token.kind() {
             TokenKind::Semicolon => {
                 self.current_token = self.scanner.get_next_token()?;
-                Ok(Stmt::Expression(Expression::new(expr)))
+                Ok(Stmt::Expression(Expression::new(Box::new(expr))))
             }
             _ => Err(Box::new(ParserError::new(
                 self.current_token.clone(),
@@ -203,6 +248,11 @@ impl Parser {
                 }
                 self.current_token = self.scanner.get_next_token()?;
                 Ok(Expr::Grouping(Grouping::new(Box::new(expr))))
+            }
+            TokenKind::Identifier(_) => {
+                let temp = self.current_token.clone();
+                self.current_token = self.scanner.get_next_token()?;
+                Ok(Expr::Variable(Variable::new(temp)))
             }
             _ => Err(Box::new(ParserError::new(
                 self.current_token.clone(),
