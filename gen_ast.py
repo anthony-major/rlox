@@ -5,6 +5,7 @@ ast = {
         "Literal: Token value",
         "Grouping: Box<Expr> expression",
         "Variable: Token name",
+        "Assign: Token name, Box<Expr> value",
     ],
     "Stmt": [
         "Expression: Box<Expr> expression",

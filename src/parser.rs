@@ -1,7 +1,8 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var, Variable},
+    ast::{Assign, Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var, Variable},
+    interpreter::RuntimeError,
     scanner::Scanner,
     token::{Token, TokenKind},
 };
@@ -145,7 +146,33 @@ impl Parser {
     }
 
     fn expression(&mut self) -> ParserResult<Expr> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> ParserResult<Expr> {
+        let expr = self.equality()?;
+
+        match self.current_token.kind() {
+            TokenKind::Equal => {
+                let equals = self.current_token.clone();
+                self.current_token = self.scanner.get_next_token()?;
+
+                let value = self.assignment()?;
+
+                match expr {
+                    Expr::Variable(variable) => {
+                        let name = variable.name.clone();
+
+                        Ok(Expr::Assign(Assign::new(name, Box::new(value))))
+                    }
+                    _ => Err(Box::new(RuntimeError::new(
+                        equals,
+                        "Invalid assignment target".to_string(),
+                    ))),
+                }
+            }
+            _ => Ok(expr),
+        }
     }
 
     fn equality(&mut self) -> ParserResult<Expr> {
