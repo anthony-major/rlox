@@ -3,6 +3,7 @@ use std::{error::Error, fmt::Display};
 use crate::{
     ast::{Assign, Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var, Variable},
     interpreter::RuntimeError,
+    lox::Lox,
     scanner::Scanner,
     token::{Token, TokenKind},
 };
@@ -189,10 +190,13 @@ impl Parser {
 
                         Ok(Expr::Assign(Assign::new(name, Box::new(value))))
                     }
-                    _ => Err(Box::new(RuntimeError::new(
-                        equals,
-                        "Invalid assignment target".to_string(),
-                    ))),
+                    _ => {
+                        Lox::error(Box::new(RuntimeError::new(
+                            equals,
+                            "Invalid assignment target".to_string(),
+                        )));
+                        Ok(expr)
+                    }
                 }
             }
             _ => Ok(expr),

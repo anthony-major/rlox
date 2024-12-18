@@ -31,4 +31,23 @@ impl Environment {
             ))
         }
     }
+
+    pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<LoxValue, RuntimeError> {
+        if let TokenKind::Identifier(id) = name.kind() {
+            if self.values.contains_key(id) {
+                *self.values.get_mut(id).unwrap() = value.clone();
+                Ok(value)
+            } else {
+                Err(RuntimeError::new(
+                    name.clone(),
+                    format!("Undefined variable '{}'", id),
+                ))
+            }
+        } else {
+            Err(RuntimeError::new(
+                name.clone(),
+                "Expected identifier to be passed to environment assign".to_string(),
+            ))
+        }
+    }
 }

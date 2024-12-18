@@ -17,7 +17,7 @@ mod parser;
 mod scanner;
 mod token;
 
-fn main() {
+fn _main() {
     let mut input = String::new();
 
     while stdin().read_line(&mut input).unwrap() != 0 {
@@ -37,7 +37,7 @@ fn main() {
     }
 }
 
-fn _main() -> ExitCode {
+fn main() -> ExitCode {
     let args = std::env::args().collect::<Vec<String>>();
 
     if args.len() > 2 {

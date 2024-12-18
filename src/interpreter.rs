@@ -196,7 +196,8 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_assign(&mut self, assign: &crate::ast::Assign) -> Self::Result {
-        todo!()
+        let value = assign.value.accept(self)?;
+        self.environment.assign(&assign.name, value)
     }
 }
 
