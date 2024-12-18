@@ -1,14 +1,20 @@
-use std::io::{stdin, stdout, Result, Write};
+use std::{
+    error::Error,
+    io::{stdin, stdout, Result, Write},
+};
 
 use crate::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
 
 #[derive(Default)]
 pub struct Lox {
     interpreter: Interpreter,
-    // errors: Vec<Box<dyn Error>>,
 }
 
 impl Lox {
+    pub fn error(err: Box<dyn Error>) {
+        println!("{}", err);
+    }
+
     pub fn run_file(&mut self, path: &str) -> Result<()> {
         let code = std::fs::read_to_string(path)?;
 
@@ -34,10 +40,6 @@ impl Lox {
 
         Ok(())
     }
-
-    // pub fn error(&mut self, err: Box<dyn Error>) {
-    //     self.errors.push(err);
-    // }
 
     fn run(&mut self, source: &str) {
         let scanner = Scanner::new(source);
