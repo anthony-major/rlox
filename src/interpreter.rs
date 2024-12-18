@@ -194,6 +194,10 @@ impl ExprVisitor for Interpreter {
             Err(err) => Err(err),
         }
     }
+
+    fn visit_assign(&mut self, assign: &crate::ast::Assign) -> Self::Result {
+        todo!()
+    }
 }
 
 impl StmtVisitor for Interpreter {

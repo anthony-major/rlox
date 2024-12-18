@@ -60,6 +60,30 @@ impl Parser {
         Ok(statements)
     }
 
+    fn synchronize(&mut self) -> ParserResult<()> {
+        self.current_token = self.scanner.get_next_token()?;
+
+        while !matches!(self.current_token.kind(), TokenKind::Eof) {
+            match self.current_token.kind() {
+                TokenKind::Semicolon => {
+                    self.current_token = self.scanner.get_next_token()?;
+                    return Ok(());
+                }
+                TokenKind::Class
+                | TokenKind::Fun
+                | TokenKind::Var
+                | TokenKind::For
+                | TokenKind::If
+                | TokenKind::While
+                | TokenKind::Print
+                | TokenKind::Return => return Ok(()),
+                _ => self.current_token = self.scanner.get_next_token()?,
+            }
+        }
+
+        Ok(())
+    }
+
     fn declaration(&mut self) -> ParserResult<Stmt> {
         if matches!(self.current_token.kind(), TokenKind::Var) {
             self.current_token = self.scanner.get_next_token()?;

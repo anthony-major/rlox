@@ -1,4 +1,4 @@
-use std::process::ExitCode;
+use std::{io::stdin, process::ExitCode};
 
 use ast::{Binary, Expr, Grouping, Literal, Unary};
 // use ast_printer::AstPrinter;
@@ -17,7 +17,27 @@ mod parser;
 mod scanner;
 mod token;
 
-fn main() -> ExitCode {
+fn main() {
+    let mut input = String::new();
+
+    while stdin().read_line(&mut input).unwrap() != 0 {
+        let mut scanner = Scanner::new(input.trim());
+        loop {
+            match scanner.get_next_token() {
+                Ok(token) => {
+                    println!("{}", token);
+                    if token.kind() == &TokenKind::Eof {
+                        break;
+                    }
+                }
+                Err(err) => println!("{}", err),
+            }
+        }
+        input.clear();
+    }
+}
+
+fn _main() -> ExitCode {
     let args = std::env::args().collect::<Vec<String>>();
 
     if args.len() > 2 {
