@@ -1,7 +1,10 @@
 use std::{error::Error, fmt::Display};
 
 use crate::{
-    ast::{Assign, Binary, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var, Variable},
+    ast::{
+        Assign, Binary, Block, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var,
+        Variable,
+    },
     interpreter::RuntimeError,
     lox::Lox,
     scanner::Scanner,
@@ -55,7 +58,10 @@ impl Parser {
         let mut statements: Vec<Stmt> = Vec::new();
 
         while self.current_token.kind() != &TokenKind::Eof {
-            statements.push(self.declaration()?);
+            match self.declaration() {
+                Ok(statement) => statements.push(statement),
+                Err(err) => Lox::error(err),
+            }
         }
 
         Ok(statements)
@@ -89,10 +95,22 @@ impl Parser {
         if matches!(self.current_token.kind(), TokenKind::Var) {
             self.current_token = self.scanner.get_next_token()?;
 
-            return self.var_declaration();
+            match self.var_declaration() {
+                Ok(statement) => return Ok(statement),
+                Err(err) => {
+                    self.synchronize()?;
+                    return Err(err);
+                }
+            }
         }
 
-        self.statement()
+        match self.statement() {
+            Ok(statement) => Ok(statement),
+            Err(err) => {
+                self.synchronize()?;
+                Err(err)
+            }
+        }
     }
 
     fn var_declaration(&mut self) -> ParserResult<Stmt> {
@@ -136,8 +154,36 @@ impl Parser {
 
             return self.print_statement();
         }
+        if matches!(self.current_token.kind(), TokenKind::LeftBrace) {
+            self.current_token = self.scanner.get_next_token()?;
+
+            return Ok(Stmt::Block(Block::new(self.block()?)));
+        }
 
         self.expression_statement()
+    }
+
+    fn block(&mut self) -> ParserResult<Vec<Stmt>> {
+        let mut statements: Vec<Stmt> = Vec::new();
+
+        while !matches!(
+            self.current_token.kind(),
+            TokenKind::RightBrace | TokenKind::Eof
+        ) {
+            statements.push(self.declaration()?);
+        }
+
+        match self.current_token.kind() {
+            TokenKind::RightBrace => {
+                self.current_token = self.scanner.get_next_token()?;
+
+                Ok(statements)
+            }
+            _ => Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect '}' after block".to_string(),
+            ))),
+        }
     }
 
     fn print_statement(&mut self) -> ParserResult<Stmt> {

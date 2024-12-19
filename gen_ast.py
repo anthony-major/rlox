@@ -8,6 +8,7 @@ ast = {
         "Assign: Token name, Box<Expr> value",
     ],
     "Stmt": [
+        "Block: Vec<Stmt> statements",
         "Expression: Box<Expr> expression",
         "Print: Box<Expr> expression",
         "Var: Token name, Option<Box<Expr>> initializer",

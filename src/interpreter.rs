@@ -1,7 +1,7 @@
-use std::{error::Error, fmt::Display};
+use std::{cell::RefCell, error::Error, fmt::Display, rc::Rc};
 
 use crate::{
-    ast::{Expr, ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
+    ast::{ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
     environment::Environment,
     token::{Token, TokenKind},
 };
@@ -63,7 +63,7 @@ impl Display for RuntimeError {
 
 #[derive(Default)]
 pub struct Interpreter {
-    environment: Environment,
+    environment: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
@@ -189,7 +189,7 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_variable(&mut self, variable: &crate::ast::Variable) -> Self::Result {
-        match self.environment.get(&variable.name) {
+        match self.environment.borrow_mut().get(&variable.name) {
             Ok(value) => Ok(value.clone()),
             Err(err) => Err(err),
         }
@@ -197,12 +197,30 @@ impl ExprVisitor for Interpreter {
 
     fn visit_assign(&mut self, assign: &crate::ast::Assign) -> Self::Result {
         let value = assign.value.accept(self)?;
-        self.environment.assign(&assign.name, value)
+        self.environment.borrow_mut().assign(&assign.name, value)
     }
 }
 
 impl StmtVisitor for Interpreter {
     type Result = Result<(), RuntimeError>;
+
+    fn visit_block(&mut self, block: &crate::ast::Block) -> Self::Result {
+        let previous = self.environment.clone();
+        self.environment = Rc::new(RefCell::new(Environment::new(previous.clone())));
+
+        for statement in &block.statements {
+            match statement.accept(self) {
+                Ok(_) => {}
+                Err(err) => {
+                    self.environment = previous;
+                    return Err(err);
+                }
+            }
+        }
+
+        self.environment = previous;
+        Ok(())
+    }
 
     fn visit_expression(&mut self, expression: &crate::ast::Expression) -> Self::Result {
         expression.expression.accept(self).map(|_| {})
@@ -224,7 +242,7 @@ impl StmtVisitor for Interpreter {
 
         match var.name.kind() {
             TokenKind::Identifier(id) => {
-                self.environment.define(id.clone(), value);
+                self.environment.borrow_mut().define(id.clone(), value);
                 Ok(())
             }
             _ => Err(RuntimeError::new(

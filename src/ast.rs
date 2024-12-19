@@ -117,9 +117,22 @@ impl ExprAccept for Expr {
     }
 }
 pub enum Stmt {
+    Block(Block),
     Expression(Expression),
     Print(Print),
     Var(Var),
+}
+
+pub struct Block {
+    pub statements: Vec<Stmt>,
+}
+
+impl Block {
+    pub fn new(statements: Vec<Stmt>) -> Self {
+        Self {
+            statements: statements,
+        }
+    }
 }
 
 pub struct Expression {
@@ -163,6 +176,7 @@ impl Var {
 pub trait StmtVisitor {
     type Result;
 
+    fn visit_block(&mut self, block: &Block) -> Self::Result;
     fn visit_expression(&mut self, expression: &Expression) -> Self::Result;
     fn visit_print(&mut self, print: &Print) -> Self::Result;
     fn visit_var(&mut self, var: &Var) -> Self::Result;
@@ -175,6 +189,7 @@ pub trait StmtAccept {
 impl StmtAccept for Stmt {
     fn accept<V: StmtVisitor>(&self, visitor: &mut V) -> V::Result {
         match self {
+            Self::Block(x) => visitor.visit_block(x),
             Self::Expression(x) => visitor.visit_expression(x),
             Self::Print(x) => visitor.visit_print(x),
             Self::Var(x) => visitor.visit_var(x),
