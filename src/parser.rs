@@ -2,8 +2,8 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Assign, Binary, Block, Expr, Expression, Grouping, IfStmt, Literal, Print, Stmt, Unary,
-        Var, Variable,
+        Assign, Binary, Block, Expr, Expression, Grouping, IfStmt, Literal, Logical, Print, Stmt,
+        Unary, Var, Variable,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -265,7 +265,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> ParserResult<Expr> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         match self.current_token.kind() {
             TokenKind::Equal => {
@@ -291,6 +291,32 @@ impl Parser {
             }
             _ => Ok(expr),
         }
+    }
+
+    fn or(&mut self) -> ParserResult<Expr> {
+        let mut expr = self.and()?;
+
+        while matches!(self.current_token.kind(), TokenKind::Or) {
+            let operator = self.current_token.clone();
+            self.current_token = self.scanner.get_next_token()?;
+            let right = self.and()?;
+            expr = Expr::Logical(Logical::new(Box::new(expr), operator, Box::new(right)));
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> ParserResult<Expr> {
+        let mut expr = self.equality()?;
+
+        while matches!(self.current_token.kind(), TokenKind::And) {
+            let operator = self.current_token.clone();
+            self.current_token = self.scanner.get_next_token()?;
+            let right = self.equality()?;
+            expr = Expr::Logical(Logical::new(Box::new(expr), operator, Box::new(right)));
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> ParserResult<Expr> {

@@ -199,6 +199,31 @@ impl ExprVisitor for Interpreter {
         let value = assign.value.accept(self)?;
         self.environment.borrow_mut().assign(&assign.name, value)
     }
+
+    fn visit_logical(&mut self, logical: &crate::ast::Logical) -> Self::Result {
+        let left = logical.left.accept(self)?;
+
+        match logical.operator.kind() {
+            TokenKind::Or => {
+                if left.is_truthy() {
+                    return Ok(left);
+                }
+            }
+            TokenKind::And => {
+                if !left.is_truthy() {
+                    return Ok(left);
+                }
+            }
+            _ => {
+                return Err(RuntimeError::new(
+                    logical.operator.clone(),
+                    "Expected logical operator".to_string(),
+                ))
+            }
+        }
+
+        logical.right.accept(self)
+    }
 }
 
 impl StmtVisitor for Interpreter {

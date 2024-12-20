@@ -7,6 +7,7 @@ pub enum Expr {
     Grouping(Grouping),
     Variable(Variable),
     Assign(Assign),
+    Logical(Logical),
 }
 
 pub struct Unary {
@@ -45,7 +46,9 @@ pub struct Literal {
 
 impl Literal {
     pub fn new(value: Token) -> Self {
-        Self { value: value }
+        Self {
+            value: value,
+        }
     }
 }
 
@@ -67,7 +70,9 @@ pub struct Variable {
 
 impl Variable {
     pub fn new(name: Token) -> Self {
-        Self { name: name }
+        Self {
+            name: name,
+        }
     }
 }
 
@@ -85,6 +90,22 @@ impl Assign {
     }
 }
 
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
+}
+
+impl Logical {
+    pub fn new(left: Box<Expr>, operator: Token, right: Box<Expr>) -> Self {
+        Self {
+            left: left,
+            operator: operator,
+            right: right,
+        }
+    }
+}
+
 pub trait ExprVisitor {
     type Result;
 
@@ -94,6 +115,7 @@ pub trait ExprVisitor {
     fn visit_grouping(&mut self, grouping: &Grouping) -> Self::Result;
     fn visit_variable(&mut self, variable: &Variable) -> Self::Result;
     fn visit_assign(&mut self, assign: &Assign) -> Self::Result;
+    fn visit_logical(&mut self, logical: &Logical) -> Self::Result;
 }
 
 pub trait ExprAccept {
@@ -109,6 +131,7 @@ impl ExprAccept for Expr {
             Self::Grouping(x) => visitor.visit_grouping(x),
             Self::Variable(x) => visitor.visit_variable(x),
             Self::Assign(x) => visitor.visit_assign(x),
+            Self::Logical(x) => visitor.visit_logical(x),
         }
     }
 }
@@ -177,11 +200,7 @@ pub struct IfStmt {
 }
 
 impl IfStmt {
-    pub fn new(
-        condition: Box<Expr>,
-        then_branch: Box<Stmt>,
-        else_branch: Option<Box<Stmt>>,
-    ) -> Self {
+    pub fn new(condition: Box<Expr>, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>>) -> Self {
         Self {
             condition: condition,
             then_branch: then_branch,

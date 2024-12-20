@@ -6,6 +6,7 @@ ast = {
         "Grouping: Box<Expr> expression",
         "Variable: Token name",
         "Assign: Token name, Box<Expr> value",
+        "Logical: Box<Expr> left, Token operator, Box<Expr> right",
     ],
     "Stmt": [
         "Block: Vec<Stmt> statements",
