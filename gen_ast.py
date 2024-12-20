@@ -12,6 +12,7 @@ ast = {
         "Expression: Box<Expr> expression",
         "Print: Box<Expr> expression",
         "Var: Token name, Option<Box<Expr>> initializer",
+        "IfStmt: Box<Expr> condition, Box<Stmt> then_branch, Option<Box<Stmt>> else_branch",
     ]
 }
 

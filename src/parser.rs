@@ -2,8 +2,8 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Assign, Binary, Block, Expr, Expression, Grouping, Literal, Print, Stmt, Unary, Var,
-        Variable,
+        Assign, Binary, Block, Expr, Expression, Grouping, IfStmt, Literal, Print, Stmt, Unary,
+        Var, Variable,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -159,8 +159,28 @@ impl Parser {
 
             return Ok(Stmt::Block(Block::new(self.block()?)));
         }
+        if matches!(self.current_token.kind(), TokenKind::If) {
+            self.current_token = self.scanner.get_next_token()?;
+
+            return self.if_statement();
+        }
 
         self.expression_statement()
+    }
+
+    fn print_statement(&mut self) -> ParserResult<Stmt> {
+        let value = self.expression()?;
+
+        match self.current_token.kind() {
+            TokenKind::Semicolon => {
+                self.current_token = self.scanner.get_next_token()?;
+                Ok(Stmt::Print(Print::new(Box::new(value))))
+            }
+            _ => Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ';' after value".to_string(),
+            ))),
+        }
     }
 
     fn block(&mut self) -> ParserResult<Vec<Stmt>> {
@@ -186,19 +206,43 @@ impl Parser {
         }
     }
 
-    fn print_statement(&mut self) -> ParserResult<Stmt> {
-        let value = self.expression()?;
-
-        match self.current_token.kind() {
-            TokenKind::Semicolon => {
-                self.current_token = self.scanner.get_next_token()?;
-                Ok(Stmt::Print(Print::new(Box::new(value))))
-            }
-            _ => Err(Box::new(ParserError::new(
+    fn if_statement(&mut self) -> ParserResult<Stmt> {
+        if !matches!(self.current_token.kind(), TokenKind::LeftParen) {
+            return Err(Box::new(ParserError::new(
                 self.current_token.clone(),
-                "Expect ';' after value".to_string(),
-            ))),
+                "Expect '(' after if".to_string(),
+            )));
         }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let condition = self.expression()?;
+
+        if !matches!(self.current_token.kind(), TokenKind::RightParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ')' after if condition".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let then_branch = self.statement()?;
+        let else_branch = match self.current_token.kind() {
+            TokenKind::Else => {
+                self.current_token = self.scanner.get_next_token()?;
+
+                Some(self.statement()?)
+            }
+            _ => None,
+        };
+
+        Ok(Stmt::IfStmt(IfStmt::new(
+            Box::new(condition),
+            Box::new(then_branch),
+            match else_branch {
+                Some(stmt) => Some(Box::new(stmt)),
+                None => None,
+            },
+        )))
     }
 
     fn expression_statement(&mut self) -> ParserResult<Stmt> {

@@ -45,9 +45,7 @@ pub struct Literal {
 
 impl Literal {
     pub fn new(value: Token) -> Self {
-        Self {
-            value: value,
-        }
+        Self { value: value }
     }
 }
 
@@ -69,9 +67,7 @@ pub struct Variable {
 
 impl Variable {
     pub fn new(name: Token) -> Self {
-        Self {
-            name: name,
-        }
+        Self { name: name }
     }
 }
 
@@ -121,6 +117,7 @@ pub enum Stmt {
     Expression(Expression),
     Print(Print),
     Var(Var),
+    IfStmt(IfStmt),
 }
 
 pub struct Block {
@@ -173,6 +170,26 @@ impl Var {
     }
 }
 
+pub struct IfStmt {
+    pub condition: Box<Expr>,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>,
+}
+
+impl IfStmt {
+    pub fn new(
+        condition: Box<Expr>,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    ) -> Self {
+        Self {
+            condition: condition,
+            then_branch: then_branch,
+            else_branch: else_branch,
+        }
+    }
+}
+
 pub trait StmtVisitor {
     type Result;
 
@@ -180,6 +197,7 @@ pub trait StmtVisitor {
     fn visit_expression(&mut self, expression: &Expression) -> Self::Result;
     fn visit_print(&mut self, print: &Print) -> Self::Result;
     fn visit_var(&mut self, var: &Var) -> Self::Result;
+    fn visit_ifstmt(&mut self, ifstmt: &IfStmt) -> Self::Result;
 }
 
 pub trait StmtAccept {
@@ -193,6 +211,7 @@ impl StmtAccept for Stmt {
             Self::Expression(x) => visitor.visit_expression(x),
             Self::Print(x) => visitor.visit_print(x),
             Self::Var(x) => visitor.visit_var(x),
+            Self::IfStmt(x) => visitor.visit_ifstmt(x),
         }
     }
 }

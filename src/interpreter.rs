@@ -251,4 +251,14 @@ impl StmtVisitor for Interpreter {
             )),
         }
     }
+
+    fn visit_ifstmt(&mut self, ifstmt: &crate::ast::IfStmt) -> Self::Result {
+        if ifstmt.condition.accept(self)?.is_truthy() {
+            ifstmt.then_branch.accept(self)?;
+        } else if let Some(stmt) = &ifstmt.else_branch {
+            stmt.accept(self)?;
+        }
+
+        Ok(())
+    }
 }
