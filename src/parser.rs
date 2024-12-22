@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display};
 use crate::{
     ast::{
         Assign, Binary, Block, Expr, Expression, Grouping, IfStmt, Literal, Logical, Print, Stmt,
-        Unary, Var, Variable,
+        Unary, Var, Variable, WhileStmt,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -164,6 +164,11 @@ impl Parser {
 
             return self.if_statement();
         }
+        if matches!(self.current_token.kind(), TokenKind::While) {
+            self.current_token = self.scanner.get_next_token()?;
+
+            return self.while_statement();
+        }
 
         self.expression_statement()
     }
@@ -242,6 +247,33 @@ impl Parser {
                 Some(stmt) => Some(Box::new(stmt)),
                 None => None,
             },
+        )))
+    }
+
+    fn while_statement(&mut self) -> ParserResult<Stmt> {
+        if !matches!(self.current_token.kind(), TokenKind::LeftParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect '(' after while".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let condition = self.expression()?;
+
+        if !matches!(self.current_token.kind(), TokenKind::RightParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ')' after condition".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let body = self.statement()?;
+
+        Ok(Stmt::WhileStmt(WhileStmt::new(
+            Box::new(condition),
+            Box::new(body),
         )))
     }
 

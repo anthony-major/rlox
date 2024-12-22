@@ -141,6 +141,7 @@ pub enum Stmt {
     Print(Print),
     Var(Var),
     IfStmt(IfStmt),
+    WhileStmt(WhileStmt),
 }
 
 pub struct Block {
@@ -209,6 +210,20 @@ impl IfStmt {
     }
 }
 
+pub struct WhileStmt {
+    pub condition: Box<Expr>,
+    pub body: Box<Stmt>,
+}
+
+impl WhileStmt {
+    pub fn new(condition: Box<Expr>, body: Box<Stmt>) -> Self {
+        Self {
+            condition: condition,
+            body: body,
+        }
+    }
+}
+
 pub trait StmtVisitor {
     type Result;
 
@@ -217,6 +232,7 @@ pub trait StmtVisitor {
     fn visit_print(&mut self, print: &Print) -> Self::Result;
     fn visit_var(&mut self, var: &Var) -> Self::Result;
     fn visit_ifstmt(&mut self, ifstmt: &IfStmt) -> Self::Result;
+    fn visit_whilestmt(&mut self, whilestmt: &WhileStmt) -> Self::Result;
 }
 
 pub trait StmtAccept {
@@ -231,6 +247,7 @@ impl StmtAccept for Stmt {
             Self::Print(x) => visitor.visit_print(x),
             Self::Var(x) => visitor.visit_var(x),
             Self::IfStmt(x) => visitor.visit_ifstmt(x),
+            Self::WhileStmt(x) => visitor.visit_whilestmt(x),
         }
     }
 }

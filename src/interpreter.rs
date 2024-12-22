@@ -286,4 +286,12 @@ impl StmtVisitor for Interpreter {
 
         Ok(())
     }
+
+    fn visit_whilestmt(&mut self, whilestmt: &crate::ast::WhileStmt) -> Self::Result {
+        while whilestmt.condition.accept(self)?.is_truthy() {
+            whilestmt.body.accept(self)?;
+        }
+
+        Ok(())
+    }
 }
