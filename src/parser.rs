@@ -169,6 +169,11 @@ impl Parser {
 
             return self.while_statement();
         }
+        if matches!(self.current_token.kind(), TokenKind::For) {
+            self.current_token = self.scanner.get_next_token()?;
+
+            return self.for_statement();
+        }
 
         self.expression_statement()
     }
@@ -275,6 +280,67 @@ impl Parser {
             Box::new(condition),
             Box::new(body),
         )))
+    }
+
+    fn for_statement(&mut self) -> ParserResult<Stmt> {
+        if !matches!(self.current_token.kind(), TokenKind::LeftParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect '(' after for".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let initializer = match self.current_token.kind() {
+            TokenKind::Semicolon => {
+                self.current_token = self.scanner.get_next_token()?;
+                None
+            }
+            TokenKind::Var => {
+                self.current_token = self.scanner.get_next_token()?;
+                Some(self.var_declaration()?)
+            }
+            _ => Some(self.expression_statement()?),
+        };
+
+        let condition = match self.current_token.kind() {
+            TokenKind::Semicolon => Expr::Literal(Literal::new(Token::new(TokenKind::True, 0))),
+            _ => self.expression()?,
+        };
+        if !matches!(self.current_token.kind(), TokenKind::Semicolon) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ';' after loop condition".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let increment = match self.current_token.kind() {
+            TokenKind::RightParen => None,
+            _ => Some(self.expression()?),
+        };
+        if !matches!(self.current_token.kind(), TokenKind::RightParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ')' after for clauses".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::Block(Block::new(vec![
+                body,
+                Stmt::Expression(Expression::new(Box::new(increment))),
+            ]));
+        }
+        body = Stmt::WhileStmt(WhileStmt::new(Box::new(condition), Box::new(body)));
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(Block::new(vec![initializer, body]));
+        }
+
+        Ok(body)
     }
 
     fn expression_statement(&mut self) -> ParserResult<Stmt> {
