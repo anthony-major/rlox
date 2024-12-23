@@ -8,6 +8,7 @@ pub enum Expr {
     Variable(Variable),
     Assign(Assign),
     Logical(Logical),
+    Call(Call),
 }
 
 pub struct Unary {
@@ -106,6 +107,22 @@ impl Logical {
     }
 }
 
+pub struct Call {
+    pub callee: Box<Expr>,
+    pub paren: Token,
+    pub arguments: Vec<Expr>,
+}
+
+impl Call {
+    pub fn new(callee: Box<Expr>, paren: Token, arguments: Vec<Expr>) -> Self {
+        Self {
+            callee: callee,
+            paren: paren,
+            arguments: arguments,
+        }
+    }
+}
+
 pub trait ExprVisitor {
     type Result;
 
@@ -116,6 +133,7 @@ pub trait ExprVisitor {
     fn visit_variable(&mut self, variable: &Variable) -> Self::Result;
     fn visit_assign(&mut self, assign: &Assign) -> Self::Result;
     fn visit_logical(&mut self, logical: &Logical) -> Self::Result;
+    fn visit_call(&mut self, call: &Call) -> Self::Result;
 }
 
 pub trait ExprAccept {
@@ -132,6 +150,7 @@ impl ExprAccept for Expr {
             Self::Variable(x) => visitor.visit_variable(x),
             Self::Assign(x) => visitor.visit_assign(x),
             Self::Logical(x) => visitor.visit_logical(x),
+            Self::Call(x) => visitor.visit_call(x),
         }
     }
 }

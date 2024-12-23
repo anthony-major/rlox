@@ -7,6 +7,7 @@ ast = {
         "Variable: Token name",
         "Assign: Token name, Box<Expr> value",
         "Logical: Box<Expr> left, Token operator, Box<Expr> right",
+        "Call: Box<Expr> callee, Token paren, Vec<Expr> arguments",
     ],
     "Stmt": [
         "Block: Vec<Stmt> statements",

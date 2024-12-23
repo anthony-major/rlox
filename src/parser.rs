@@ -2,8 +2,8 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Assign, Binary, Block, Expr, Expression, Grouping, IfStmt, Literal, Logical, Print, Stmt,
-        Unary, Var, Variable, WhileStmt,
+        Assign, Binary, Block, Call, Expr, Expression, Grouping, IfStmt, Literal, Logical, Print,
+        Stmt, Unary, Var, Variable, WhileStmt,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -492,7 +492,56 @@ impl Parser {
             return Ok(Expr::Unary(Unary::new(operator, Box::new(right))));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> ParserResult<Expr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            match self.current_token.kind() {
+                TokenKind::LeftParen => {
+                    self.current_token = self.scanner.get_next_token()?;
+                    expr = self.finish_call(expr)?;
+                }
+                _ => break,
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> ParserResult<Expr> {
+        let mut arguments: Vec<Expr> = Vec::new();
+
+        if matches!(self.current_token.kind(), TokenKind::RightParen) {
+            let paren = self.current_token.clone();
+            self.current_token = self.scanner.get_next_token()?;
+            return Ok(Expr::Call(Call::new(Box::new(callee), paren, arguments)));
+        }
+
+        arguments.push(self.expression()?);
+        while matches!(self.current_token.kind(), TokenKind::Comma) {
+            self.current_token = self.scanner.get_next_token()?;
+            if arguments.len() >= 255 {
+                Lox::error(Box::new(ParserError::new(
+                    self.current_token.clone(),
+                    "Can't have more than 255 arguments".to_string(),
+                )));
+            }
+            arguments.push(self.expression()?);
+        }
+
+        if !matches!(self.current_token.kind(), TokenKind::RightParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ')' after arguments".to_string(),
+            )));
+        }
+        let paren = self.current_token.clone();
+        self.current_token = self.scanner.get_next_token()?;
+
+        Ok(Expr::Call(Call::new(Box::new(callee), paren, arguments)))
     }
 
     fn primary(&mut self) -> ParserResult<Expr> {

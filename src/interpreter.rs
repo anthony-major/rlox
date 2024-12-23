@@ -1,4 +1,10 @@
-use std::{cell::RefCell, error::Error, fmt::Display, rc::Rc};
+use std::{
+    cell::RefCell,
+    error::Error,
+    fmt::{Debug, Display},
+    rc::Rc,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 use crate::{
     ast::{ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
@@ -12,6 +18,7 @@ pub enum LoxValue {
     Boolean(bool),
     Number(f64),
     String(String),
+    Callable(LoxCallable),
 }
 
 impl LoxValue {
@@ -31,7 +38,44 @@ impl Display for LoxValue {
             Self::Boolean(b) => write!(f, "{}", b),
             Self::String(s) => write!(f, "{}", s),
             Self::Number(x) => write!(f, "{}", x.to_string().trim_end_matches(".0")),
+            Self::Callable(c) => write!(f, "{:?}", c),
         }
+    }
+}
+
+#[derive(Clone)]
+struct LoxCallable {
+    arity: usize,
+    function: Rc<dyn Fn() -> LoxValue>,
+}
+
+impl LoxCallable {
+    pub fn new(arity: usize, function: Rc<dyn Fn() -> LoxValue>) -> Self {
+        Self { arity, function }
+    }
+
+    pub fn arity(&self) -> usize {
+        self.arity
+    }
+
+    pub fn call(&self) -> LoxValue {
+        (self.function)()
+    }
+}
+
+impl Debug for LoxCallable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LoxCallable {{ arity: {} }}", self.arity)
+    }
+}
+
+impl PartialEq for LoxCallable {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
     }
 }
 
@@ -61,9 +105,33 @@ impl Display for RuntimeError {
     }
 }
 
-#[derive(Default)]
 pub struct Interpreter {
     environment: Rc<RefCell<Environment>>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        let mut globals = Environment::default();
+
+        globals.define(
+            "clock".to_string(),
+            LoxValue::Callable(LoxCallable::new(
+                0,
+                Rc::new(|| {
+                    LoxValue::Number(
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs_f64(),
+                    )
+                }),
+            )),
+        );
+
+        Self {
+            environment: Rc::new(RefCell::new(globals)),
+        }
+    }
 }
 
 impl Interpreter {
@@ -223,6 +291,38 @@ impl ExprVisitor for Interpreter {
         }
 
         logical.right.accept(self)
+    }
+
+    fn visit_call(&mut self, call: &crate::ast::Call) -> Self::Result {
+        let callee = call.callee.accept(self)?;
+
+        let mut arguments: Vec<LoxValue> = Vec::new();
+        for argument in &call.arguments {
+            arguments.push(argument.accept(self)?);
+        }
+
+        let function = match callee {
+            LoxValue::Callable(callable) => callable,
+            _ => {
+                return Err(RuntimeError::new(
+                    call.paren.clone(),
+                    "Can only call functions and classes".to_string(),
+                ))
+            }
+        };
+
+        if arguments.len() != function.arity() {
+            return Err(RuntimeError::new(
+                call.paren.clone(),
+                format!(
+                    "Expected {} arguments but got {}",
+                    function.arity(),
+                    arguments.len()
+                ),
+            ));
+        }
+
+        Ok(function.call())
     }
 }
 
