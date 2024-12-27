@@ -161,6 +161,7 @@ pub enum Stmt {
     Var(Var),
     IfStmt(IfStmt),
     WhileStmt(WhileStmt),
+    Function(Function),
 }
 
 pub struct Block {
@@ -243,6 +244,22 @@ impl WhileStmt {
     }
 }
 
+pub struct Function {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+impl Function {
+    pub fn new(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        Self {
+            name: name,
+            params: params,
+            body: body,
+        }
+    }
+}
+
 pub trait StmtVisitor {
     type Result;
 
@@ -252,6 +269,7 @@ pub trait StmtVisitor {
     fn visit_var(&mut self, var: &Var) -> Self::Result;
     fn visit_ifstmt(&mut self, ifstmt: &IfStmt) -> Self::Result;
     fn visit_whilestmt(&mut self, whilestmt: &WhileStmt) -> Self::Result;
+    fn visit_function(&mut self, function: &Function) -> Self::Result;
 }
 
 pub trait StmtAccept {
@@ -267,6 +285,7 @@ impl StmtAccept for Stmt {
             Self::Var(x) => visitor.visit_var(x),
             Self::IfStmt(x) => visitor.visit_ifstmt(x),
             Self::WhileStmt(x) => visitor.visit_whilestmt(x),
+            Self::Function(x) => visitor.visit_function(x),
         }
     }
 }

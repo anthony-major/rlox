@@ -92,16 +92,30 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> ParserResult<Stmt> {
-        if matches!(self.current_token.kind(), TokenKind::Var) {
-            self.current_token = self.scanner.get_next_token()?;
+        match self.current_token.kind() {
+            TokenKind::Var => {
+                self.current_token = self.scanner.get_next_token()?;
 
-            match self.var_declaration() {
-                Ok(statement) => return Ok(statement),
-                Err(err) => {
-                    self.synchronize()?;
-                    return Err(err);
+                match self.var_declaration() {
+                    Ok(statement) => return Ok(statement),
+                    Err(err) => {
+                        self.synchronize()?;
+                        return Err(err);
+                    }
                 }
             }
+            TokenKind::Fun => {
+                self.current_token = self.scanner.get_next_token()?;
+
+                match self.function() {
+                    Ok(statement) => return Ok(statement),
+                    Err(err) => {
+                        self.synchronize()?;
+                        return Err(err);
+                    }
+                }
+            }
+            _ => {}
         }
 
         match self.statement() {
@@ -146,6 +160,10 @@ impl Parser {
                 "Expected ';' after variable declaration".to_string(),
             ))),
         }
+    }
+
+    fn function(&mut self) -> ParserResult<Stmt> {
+        todo!()
     }
 
     fn statement(&mut self) -> ParserResult<Stmt> {
