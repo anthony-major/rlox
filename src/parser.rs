@@ -2,8 +2,8 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Assign, Binary, Block, Call, Expr, Expression, Grouping, IfStmt, Literal, Logical, Print,
-        Stmt, Unary, Var, Variable, WhileStmt,
+        Assign, Binary, Block, Call, Expr, Expression, Function, Grouping, IfStmt, Literal,
+        Logical, Print, Stmt, Unary, Var, Variable, WhileStmt,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -36,6 +36,21 @@ impl Display for ParserError {
             self.token.kind(),
             self.message
         )
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FunctionKind {
+    Function,
+    Method,
+}
+
+impl Display for FunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Function => write!(f, "function"),
+            Self::Method => write!(f, "method"),
+        }
     }
 }
 
@@ -107,7 +122,7 @@ impl Parser {
             TokenKind::Fun => {
                 self.current_token = self.scanner.get_next_token()?;
 
-                match self.function() {
+                match self.function(FunctionKind::Function) {
                     Ok(statement) => return Ok(statement),
                     Err(err) => {
                         self.synchronize()?;
@@ -162,8 +177,77 @@ impl Parser {
         }
     }
 
-    fn function(&mut self) -> ParserResult<Stmt> {
-        todo!()
+    fn function(&mut self, kind: FunctionKind) -> ParserResult<Stmt> {
+        let name = match self.current_token.kind() {
+            TokenKind::Identifier(_) => self.current_token.clone(),
+            _ => {
+                return Err(Box::new(ParserError::new(
+                    self.current_token.clone(),
+                    format!("Expect {} name", kind),
+                )))
+            }
+        };
+        self.current_token = self.scanner.get_next_token()?;
+
+        if !matches!(self.current_token.kind(), TokenKind::LeftParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                format!("Expect '(' after {} name", kind),
+            )));
+        }
+
+        let mut parameters: Vec<Token> = Vec::new();
+
+        if !matches!(self.current_token.kind(), TokenKind::RightParen) {
+            loop {
+                self.current_token = self.scanner.get_next_token()?;
+
+                if parameters.len() >= 255 {
+                    Lox::error(Box::new(ParserError::new(
+                        self.current_token.clone(),
+                        "Can't have more than 255 parameters".to_string(),
+                    )));
+                }
+
+                match self.current_token.kind() {
+                    TokenKind::Identifier(_) => {
+                        let temp = self.current_token.clone();
+                        self.current_token = self.scanner.get_next_token()?;
+                        parameters.push(temp);
+                    }
+                    _ => {
+                        return Err(Box::new(ParserError::new(
+                            self.current_token.clone(),
+                            "Expect parameter name".to_string(),
+                        )))
+                    }
+                }
+
+                if !matches!(self.current_token.kind(), TokenKind::Comma) {
+                    break;
+                }
+            }
+        }
+
+        if !matches!(self.current_token.kind(), TokenKind::RightParen) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ')' after parameters".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        if !matches!(self.current_token.kind(), TokenKind::LeftBrace) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                format!("Expect '{{' before {} body", kind),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let body = self.block()?;
+
+        Ok(Stmt::Function(Function::new(name, parameters, body)))
     }
 
     fn statement(&mut self) -> ParserResult<Stmt> {
