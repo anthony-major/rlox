@@ -195,6 +195,7 @@ impl Parser {
                 format!("Expect '(' after {} name", kind),
             )));
         }
+        self.current_token = self.scanner.get_next_token()?;
 
         let mut parameters: Vec<Token> = Vec::new();
 
