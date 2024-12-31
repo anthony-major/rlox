@@ -1,0 +1,15 @@
+var n = 5;
+
+fun sayHi(first, last) {
+    print "Hi, " + first + " " + last + "!";
+}
+
+fun count(n) {
+    if (n > 1) count(n - 1);
+    print n;
+}
+
+print n; // 5
+sayHi("Dear", "Reader");
+count(3);
+print n; // Should still print 5

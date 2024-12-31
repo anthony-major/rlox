@@ -1,5 +1,6 @@
 use crate::token::Token;
 
+#[derive(Debug, Clone)]
 pub enum Expr {
     Unary(Unary),
     Binary(Binary),
@@ -11,6 +12,7 @@ pub enum Expr {
     Call(Call),
 }
 
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub operator: Token,
     pub right: Box<Expr>,
@@ -25,6 +27,7 @@ impl Unary {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub operator: Token,
@@ -41,18 +44,18 @@ impl Binary {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Literal {
     pub value: Token,
 }
 
 impl Literal {
     pub fn new(value: Token) -> Self {
-        Self {
-            value: value,
-        }
+        Self { value: value }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Grouping {
     pub expression: Box<Expr>,
 }
@@ -65,18 +68,18 @@ impl Grouping {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub name: Token,
 }
 
 impl Variable {
     pub fn new(name: Token) -> Self {
-        Self {
-            name: name,
-        }
+        Self { name: name }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
@@ -91,6 +94,7 @@ impl Assign {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Logical {
     pub left: Box<Expr>,
     pub operator: Token,
@@ -107,6 +111,7 @@ impl Logical {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Call {
     pub callee: Box<Expr>,
     pub paren: Token,
@@ -154,6 +159,7 @@ impl ExprAccept for Expr {
         }
     }
 }
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Block(Block),
     Expression(Expression),
@@ -164,6 +170,7 @@ pub enum Stmt {
     Function(Function),
 }
 
+#[derive(Debug, Clone)]
 pub struct Block {
     pub statements: Vec<Stmt>,
 }
@@ -176,6 +183,7 @@ impl Block {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Expression {
     pub expression: Box<Expr>,
 }
@@ -188,6 +196,7 @@ impl Expression {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Print {
     pub expression: Box<Expr>,
 }
@@ -200,6 +209,7 @@ impl Print {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Var {
     pub name: Token,
     pub initializer: Option<Box<Expr>>,
@@ -214,6 +224,7 @@ impl Var {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IfStmt {
     pub condition: Box<Expr>,
     pub then_branch: Box<Stmt>,
@@ -221,7 +232,11 @@ pub struct IfStmt {
 }
 
 impl IfStmt {
-    pub fn new(condition: Box<Expr>, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>>) -> Self {
+    pub fn new(
+        condition: Box<Expr>,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    ) -> Self {
         Self {
             condition: condition,
             then_branch: then_branch,
@@ -230,6 +245,7 @@ impl IfStmt {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct WhileStmt {
     pub condition: Box<Expr>,
     pub body: Box<Stmt>,
@@ -244,6 +260,7 @@ impl WhileStmt {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Function {
     pub name: Token,
     pub params: Vec<Token>,

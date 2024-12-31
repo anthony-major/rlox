@@ -3,7 +3,7 @@ use std::{
     error::Error,
     fmt::{Debug, Display},
     rc::Rc,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
@@ -18,7 +18,8 @@ pub enum LoxValue {
     Boolean(bool),
     Number(f64),
     String(String),
-    Callable(LoxCallable),
+    Function(Function),
+    NativeFunction(NativeFunction),
 }
 
 impl LoxValue {
@@ -38,38 +39,116 @@ impl Display for LoxValue {
             Self::Boolean(b) => write!(f, "{}", b),
             Self::String(s) => write!(f, "{}", s),
             Self::Number(x) => write!(f, "{}", x.to_string().trim_end_matches(".0")),
-            Self::Callable(c) => write!(f, "{:?}", c),
+            Self::Function(fun) => write!(f, "{:?}", fun),
+            Self::NativeFunction(nfun) => write!(f, "{:?}", nfun),
         }
     }
 }
 
+trait LoxCallable {
+    fn arity(&self) -> usize;
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<LoxValue>,
+    ) -> Result<LoxValue, RuntimeError>;
+}
+
 #[derive(Clone)]
-struct LoxCallable {
-    arity: usize,
+pub struct NativeFunction {
     function: Rc<dyn Fn() -> LoxValue>,
 }
 
-impl LoxCallable {
-    pub fn new(arity: usize, function: Rc<dyn Fn() -> LoxValue>) -> Self {
-        Self { arity, function }
-    }
-
-    pub fn arity(&self) -> usize {
-        self.arity
-    }
-
-    pub fn call(&self) -> LoxValue {
-        (self.function)()
+impl NativeFunction {
+    pub fn new(function: Rc<dyn Fn() -> LoxValue>) -> Self {
+        Self { function }
     }
 }
 
-impl Debug for LoxCallable {
+impl LoxCallable for NativeFunction {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(
+        &self,
+        _interpreter: &mut Interpreter,
+        _arguments: Vec<LoxValue>,
+    ) -> Result<LoxValue, RuntimeError> {
+        Ok((self.function)())
+    }
+}
+
+impl Debug for NativeFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "LoxCallable {{ arity: {} }}", self.arity)
+        write!(f, "{:?}", self)
     }
 }
 
-impl PartialEq for LoxCallable {
+impl PartialEq for NativeFunction {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    declaration: crate::ast::Function,
+}
+
+impl Function {
+    pub fn new(declaration: crate::ast::Function) -> Self {
+        Self { declaration }
+    }
+}
+
+impl LoxCallable for Function {
+    fn arity(&self) -> usize {
+        self.declaration.params.len()
+    }
+
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<LoxValue>,
+    ) -> Result<LoxValue, RuntimeError> {
+        let mut environment = Environment::new(interpreter.globals.clone());
+
+        for (i, parameter) in self.declaration.params.iter().enumerate() {
+            match parameter.kind() {
+                TokenKind::Identifier(id) => environment.define(id.clone(), arguments[i].clone()),
+                _ => {
+                    return Err(RuntimeError::new(
+                        parameter.clone(),
+                        "Expect identifier".to_string(),
+                    ))
+                }
+            }
+        }
+
+        let previous = interpreter.environment.clone();
+        interpreter.environment = Rc::new(RefCell::new(environment));
+
+        for statement in &self.declaration.body {
+            match statement.accept(&mut *interpreter) {
+                Ok(_) => {}
+                Err(err) => {
+                    interpreter.environment = previous;
+                    return Err(err);
+                }
+            }
+        }
+
+        interpreter.environment = previous;
+        Ok(LoxValue::Nil)
+    }
+}
+
+impl PartialEq for Function {
     fn eq(&self, _other: &Self) -> bool {
         false
     }
@@ -105,8 +184,10 @@ impl Display for RuntimeError {
     }
 }
 
+#[derive(Clone)]
 pub struct Interpreter {
     environment: Rc<RefCell<Environment>>,
+    globals: Rc<RefCell<Environment>>,
 }
 
 impl Default for Interpreter {
@@ -115,21 +196,21 @@ impl Default for Interpreter {
 
         globals.define(
             "clock".to_string(),
-            LoxValue::Callable(LoxCallable::new(
-                0,
-                Rc::new(|| {
-                    LoxValue::Number(
-                        SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs_f64(),
-                    )
-                }),
-            )),
+            LoxValue::NativeFunction(NativeFunction::new(Rc::new(|| {
+                LoxValue::Number(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs_f64(),
+                )
+            }))),
         );
 
+        let environment = Rc::new(RefCell::new(globals));
+
         Self {
-            environment: Rc::new(RefCell::new(globals)),
+            environment: environment.clone(),
+            globals: environment.clone(),
         }
     }
 }
@@ -301,8 +382,9 @@ impl ExprVisitor for Interpreter {
             arguments.push(argument.accept(self)?);
         }
 
-        let function = match callee {
-            LoxValue::Callable(callable) => callable,
+        let function: Box<dyn LoxCallable> = match callee {
+            LoxValue::NativeFunction(nfun) => Box::new(nfun),
+            LoxValue::Function(fun) => Box::new(fun),
             _ => {
                 return Err(RuntimeError::new(
                     call.paren.clone(),
@@ -322,7 +404,7 @@ impl ExprVisitor for Interpreter {
             ));
         }
 
-        Ok(function.call())
+        function.call(self, arguments)
     }
 }
 
@@ -390,6 +472,22 @@ impl StmtVisitor for Interpreter {
     fn visit_whilestmt(&mut self, whilestmt: &crate::ast::WhileStmt) -> Self::Result {
         while whilestmt.condition.accept(self)?.is_truthy() {
             whilestmt.body.accept(self)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_function(&mut self, function: &crate::ast::Function) -> Self::Result {
+        let fun = LoxValue::Function(Function::new(function.clone()));
+
+        match function.name.kind() {
+            TokenKind::Identifier(id) => self.environment.borrow_mut().define(id.clone(), fun),
+            _ => {
+                return Err(RuntimeError::new(
+                    function.name.clone(),
+                    "Expect identifier".to_string(),
+                ))
+            }
         }
 
         Ok(())
