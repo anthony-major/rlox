@@ -51,7 +51,7 @@ trait LoxCallable {
         &self,
         interpreter: &mut Interpreter,
         arguments: Vec<LoxValue>,
-    ) -> Result<LoxValue, RuntimeError>;
+    ) -> Result<LoxValue, Box<dyn Error>>;
 }
 
 #[derive(Clone)]
@@ -74,7 +74,7 @@ impl LoxCallable for NativeFunction {
         &self,
         _interpreter: &mut Interpreter,
         _arguments: Vec<LoxValue>,
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue, Box<dyn Error>> {
         Ok((self.function)())
     }
 }
@@ -115,17 +115,17 @@ impl LoxCallable for Function {
         &self,
         interpreter: &mut Interpreter,
         arguments: Vec<LoxValue>,
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue, Box<dyn Error>> {
         let mut environment = Environment::new(interpreter.globals.clone());
 
         for (i, parameter) in self.declaration.params.iter().enumerate() {
             match parameter.kind() {
                 TokenKind::Identifier(id) => environment.define(id.clone(), arguments[i].clone()),
                 _ => {
-                    return Err(RuntimeError::new(
+                    return Err(Box::new(RuntimeError::new(
                         parameter.clone(),
                         "Expect identifier".to_string(),
-                    ))
+                    )))
                 }
             }
         }
@@ -138,6 +138,11 @@ impl LoxCallable for Function {
                 Ok(_) => {}
                 Err(err) => {
                     interpreter.environment = previous;
+
+                    if let Some(return_err) = err.downcast_ref::<ReturnError>() {
+                        return Ok(return_err.value.clone());
+                    }
+
                     return Err(err);
                 }
             }
@@ -181,6 +186,25 @@ impl Display for RuntimeError {
             self.token.kind(),
             self.message
         )
+    }
+}
+
+#[derive(Debug)]
+struct ReturnError {
+    value: LoxValue,
+}
+
+impl ReturnError {
+    pub fn new(value: LoxValue) -> Self {
+        Self { value }
+    }
+}
+
+impl Error for ReturnError {}
+
+impl Display for ReturnError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
@@ -230,18 +254,18 @@ fn evaluate_number_operands<F: Fn(f64, f64) -> LoxValue>(
     left: LoxValue,
     right: LoxValue,
     operation: F,
-) -> Result<LoxValue, RuntimeError> {
+) -> Result<LoxValue, Box<dyn Error>> {
     match (left, right) {
         (LoxValue::Number(x), LoxValue::Number(y)) => Ok(operation(x, y)),
-        _ => Err(RuntimeError::new(
+        _ => Err(Box::new(RuntimeError::new(
             operator,
             "Expected two numbers for binary operator".to_string(),
-        )),
+        ))),
     }
 }
 
 impl ExprVisitor for Interpreter {
-    type Result = Result<LoxValue, RuntimeError>;
+    type Result = Result<LoxValue, Box<dyn Error>>;
 
     fn visit_literal(&mut self, literal: &crate::ast::Literal) -> Self::Result {
         match literal.value.kind() {
@@ -250,10 +274,10 @@ impl ExprVisitor for Interpreter {
             TokenKind::False => Ok(LoxValue::Boolean(false)),
             TokenKind::Number(x) => Ok(LoxValue::Number(x.clone())),
             TokenKind::String(s) => Ok(LoxValue::String(s.clone())),
-            _ => Err(RuntimeError::new(
+            _ => Err(Box::new(RuntimeError::new(
                 literal.value.clone(),
                 "Expected literal".to_string(),
-            )),
+            ))),
         }
     }
 
@@ -267,16 +291,16 @@ impl ExprVisitor for Interpreter {
         match unary.operator.kind() {
             TokenKind::Minus => match right {
                 LoxValue::Number(x) => Ok(LoxValue::Number(-x)),
-                _ => Err(RuntimeError::new(
+                _ => Err(Box::new(RuntimeError::new(
                     unary.operator.clone(),
                     "Expected number after unary operator".to_string(),
-                )),
+                ))),
             },
             TokenKind::Bang => Ok(LoxValue::Boolean(!right.is_truthy())),
-            _ => Err(RuntimeError::new(
+            _ => Err(Box::new(RuntimeError::new(
                 unary.operator.clone(),
                 "Expected unary operator".to_string(),
-            )),
+            ))),
         }
     }
 
@@ -303,10 +327,10 @@ impl ExprVisitor for Interpreter {
             TokenKind::Plus => match (left, right) {
                 (LoxValue::Number(x), LoxValue::Number(y)) => Ok(LoxValue::Number(x + y)),
                 (LoxValue::String(x), LoxValue::String(y)) => Ok(LoxValue::String(x + &y)),
-                _ => Err(RuntimeError::new(
+                _ => Err(Box::new(RuntimeError::new(
                     binary.operator.clone(),
                     "Expected two numbers or two strings".to_string(),
-                )),
+                ))),
             },
             TokenKind::Greater => {
                 evaluate_number_operands(binary.operator.clone(), left, right, |x, y| {
@@ -330,10 +354,10 @@ impl ExprVisitor for Interpreter {
             }
             TokenKind::BangEqual => Ok(LoxValue::Boolean(left != right)),
             TokenKind::EqualEqual => Ok(LoxValue::Boolean(left == right)),
-            _ => Err(RuntimeError::new(
+            _ => Err(Box::new(RuntimeError::new(
                 binary.operator.clone(),
                 "Expected binary operator".to_string(),
-            )),
+            ))),
         }
     }
 
@@ -364,10 +388,10 @@ impl ExprVisitor for Interpreter {
                 }
             }
             _ => {
-                return Err(RuntimeError::new(
+                return Err(Box::new(RuntimeError::new(
                     logical.operator.clone(),
                     "Expected logical operator".to_string(),
-                ))
+                )))
             }
         }
 
@@ -386,22 +410,22 @@ impl ExprVisitor for Interpreter {
             LoxValue::NativeFunction(nfun) => Box::new(nfun),
             LoxValue::Function(fun) => Box::new(fun),
             _ => {
-                return Err(RuntimeError::new(
+                return Err(Box::new(RuntimeError::new(
                     call.paren.clone(),
                     "Can only call functions and classes".to_string(),
-                ))
+                )))
             }
         };
 
         if arguments.len() != function.arity() {
-            return Err(RuntimeError::new(
+            return Err(Box::new(RuntimeError::new(
                 call.paren.clone(),
                 format!(
                     "Expected {} arguments but got {}",
                     function.arity(),
                     arguments.len()
                 ),
-            ));
+            )));
         }
 
         function.call(self, arguments)
@@ -409,7 +433,7 @@ impl ExprVisitor for Interpreter {
 }
 
 impl StmtVisitor for Interpreter {
-    type Result = Result<(), RuntimeError>;
+    type Result = Result<(), Box<dyn Error>>;
 
     fn visit_block(&mut self, block: &crate::ast::Block) -> Self::Result {
         let previous = self.environment.clone();
@@ -452,10 +476,10 @@ impl StmtVisitor for Interpreter {
                 self.environment.borrow_mut().define(id.clone(), value);
                 Ok(())
             }
-            _ => Err(RuntimeError::new(
+            _ => Err(Box::new(RuntimeError::new(
                 var.name.clone(),
                 "Expected identifier".to_string(),
-            )),
+            ))),
         }
     }
 
@@ -483,13 +507,22 @@ impl StmtVisitor for Interpreter {
         match function.name.kind() {
             TokenKind::Identifier(id) => self.environment.borrow_mut().define(id.clone(), fun),
             _ => {
-                return Err(RuntimeError::new(
+                return Err(Box::new(RuntimeError::new(
                     function.name.clone(),
                     "Expect identifier".to_string(),
-                ))
+                )))
             }
         }
 
         Ok(())
+    }
+
+    fn visit_returnstmt(&mut self, returnstmt: &crate::ast::ReturnStmt) -> Self::Result {
+        let value = match &returnstmt.value {
+            Some(expr) => expr.accept(self)?,
+            None => LoxValue::Nil,
+        };
+
+        Err(Box::new(ReturnError::new(value)))
     }
 }

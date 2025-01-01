@@ -1,0 +1,16 @@
+var a = 0;
+
+fun one() {
+    var a = 1;
+
+    fun two(n) {
+        if (n == 0) return;
+        print a; // 1
+        two(n - 1);
+    }
+
+    print a; // 1
+    two(2);
+}
+
+one();

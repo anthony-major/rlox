@@ -51,7 +51,9 @@ pub struct Literal {
 
 impl Literal {
     pub fn new(value: Token) -> Self {
-        Self { value: value }
+        Self {
+            value: value,
+        }
     }
 }
 
@@ -75,7 +77,9 @@ pub struct Variable {
 
 impl Variable {
     pub fn new(name: Token) -> Self {
-        Self { name: name }
+        Self {
+            name: name,
+        }
     }
 }
 
@@ -168,6 +172,7 @@ pub enum Stmt {
     IfStmt(IfStmt),
     WhileStmt(WhileStmt),
     Function(Function),
+    ReturnStmt(ReturnStmt),
 }
 
 #[derive(Debug, Clone)]
@@ -232,11 +237,7 @@ pub struct IfStmt {
 }
 
 impl IfStmt {
-    pub fn new(
-        condition: Box<Expr>,
-        then_branch: Box<Stmt>,
-        else_branch: Option<Box<Stmt>>,
-    ) -> Self {
+    pub fn new(condition: Box<Expr>, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>>) -> Self {
         Self {
             condition: condition,
             then_branch: then_branch,
@@ -277,6 +278,21 @@ impl Function {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ReturnStmt {
+    pub keyword: Token,
+    pub value: Option<Box<Expr>>,
+}
+
+impl ReturnStmt {
+    pub fn new(keyword: Token, value: Option<Box<Expr>>) -> Self {
+        Self {
+            keyword: keyword,
+            value: value,
+        }
+    }
+}
+
 pub trait StmtVisitor {
     type Result;
 
@@ -287,6 +303,7 @@ pub trait StmtVisitor {
     fn visit_ifstmt(&mut self, ifstmt: &IfStmt) -> Self::Result;
     fn visit_whilestmt(&mut self, whilestmt: &WhileStmt) -> Self::Result;
     fn visit_function(&mut self, function: &Function) -> Self::Result;
+    fn visit_returnstmt(&mut self, returnstmt: &ReturnStmt) -> Self::Result;
 }
 
 pub trait StmtAccept {
@@ -303,6 +320,7 @@ impl StmtAccept for Stmt {
             Self::IfStmt(x) => visitor.visit_ifstmt(x),
             Self::WhileStmt(x) => visitor.visit_whilestmt(x),
             Self::Function(x) => visitor.visit_function(x),
+            Self::ReturnStmt(x) => visitor.visit_returnstmt(x),
         }
     }
 }

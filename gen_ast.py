@@ -17,6 +17,7 @@ ast = {
         "IfStmt: Box<Expr> condition, Box<Stmt> then_branch, Option<Box<Stmt>> else_branch",
         "WhileStmt: Box<Expr> condition, Box<Stmt> body",
         "Function: Token name, Vec<Token> params, Vec<Stmt> body",
+        "ReturnStmt: Token keyword, Option<Box<Expr>> value",
     ]
 }
 

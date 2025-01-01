@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display};
 use crate::{
     ast::{
         Assign, Binary, Block, Call, Expr, Expression, Function, Grouping, IfStmt, Literal,
-        Logical, Print, Stmt, Unary, Var, Variable, WhileStmt,
+        Logical, Print, ReturnStmt, Stmt, Unary, Var, Variable, WhileStmt,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -201,8 +201,6 @@ impl Parser {
 
         if !matches!(self.current_token.kind(), TokenKind::RightParen) {
             loop {
-                self.current_token = self.scanner.get_next_token()?;
-
                 if parameters.len() >= 255 {
                     Lox::error(Box::new(ParserError::new(
                         self.current_token.clone(),
@@ -227,6 +225,7 @@ impl Parser {
                 if !matches!(self.current_token.kind(), TokenKind::Comma) {
                     break;
                 }
+                self.current_token = self.scanner.get_next_token()?;
             }
         }
 
@@ -276,6 +275,11 @@ impl Parser {
             self.current_token = self.scanner.get_next_token()?;
 
             return self.for_statement();
+        }
+        if matches!(self.current_token.kind(), TokenKind::Return) {
+            // We don't go to the next token here because we need the "return" token
+            // in the return_statement function
+            return self.return_statement();
         }
 
         self.expression_statement()
@@ -444,6 +448,29 @@ impl Parser {
         }
 
         Ok(body)
+    }
+
+    fn return_statement(&mut self) -> ParserResult<Stmt> {
+        let keyword = self.current_token.clone();
+        self.current_token = self.scanner.get_next_token()?;
+
+        let value = match self.current_token.kind() {
+            TokenKind::Semicolon => None,
+            _ => Some(self.expression()?),
+        };
+
+        if !matches!(self.current_token.kind(), TokenKind::Semicolon) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect ';' after return value".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        Ok(Stmt::ReturnStmt(ReturnStmt::new(
+            keyword,
+            value.map(|expr| Box::new(expr)),
+        )))
     }
 
     fn expression_statement(&mut self) -> ParserResult<Stmt> {
