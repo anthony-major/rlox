@@ -95,14 +95,18 @@ impl PartialEq for NativeFunction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     declaration: crate::ast::Function,
+    closure: Rc<RefCell<Environment>>,
 }
 
 impl Function {
-    pub fn new(declaration: crate::ast::Function) -> Self {
-        Self { declaration }
+    pub fn new(declaration: crate::ast::Function, closure: Rc<RefCell<Environment>>) -> Self {
+        Self {
+            declaration,
+            closure,
+        }
     }
 }
 
@@ -116,7 +120,7 @@ impl LoxCallable for Function {
         interpreter: &mut Interpreter,
         arguments: Vec<LoxValue>,
     ) -> Result<LoxValue, Box<dyn Error>> {
-        let mut environment = Environment::new(interpreter.globals.clone());
+        let mut environment = Environment::new(self.closure.clone());
 
         for (i, parameter) in self.declaration.params.iter().enumerate() {
             match parameter.kind() {
@@ -150,6 +154,12 @@ impl LoxCallable for Function {
 
         interpreter.environment = previous;
         Ok(LoxValue::Nil)
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -502,7 +512,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_function(&mut self, function: &crate::ast::Function) -> Self::Result {
-        let fun = LoxValue::Function(Function::new(function.clone()));
+        let fun = LoxValue::Function(Function::new(function.clone(), self.environment.clone()));
 
         match function.name.kind() {
             TokenKind::Identifier(id) => self.environment.borrow_mut().define(id.clone(), fun),
