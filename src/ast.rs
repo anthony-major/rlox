@@ -169,6 +169,7 @@ pub enum Stmt {
     WhileStmt(WhileStmt),
     Function(Function),
     ReturnStmt(ReturnStmt),
+    Class(Class),
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -293,6 +294,21 @@ impl ReturnStmt {
     }
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct Class {
+    pub name: Token,
+    pub methods: Vec<Function>,
+}
+
+impl Class {
+    pub fn new(name: Token, methods: Vec<Function>) -> Self {
+        Self {
+            name: name,
+            methods: methods,
+        }
+    }
+}
+
 pub trait StmtVisitor {
     type Result;
 
@@ -304,6 +320,7 @@ pub trait StmtVisitor {
     fn visit_whilestmt(&mut self, whilestmt: &WhileStmt) -> Self::Result;
     fn visit_function(&mut self, function: &Function) -> Self::Result;
     fn visit_returnstmt(&mut self, returnstmt: &ReturnStmt) -> Self::Result;
+    fn visit_class(&mut self, class: &Class) -> Self::Result;
 }
 
 pub trait StmtAccept {
@@ -321,6 +338,7 @@ impl StmtAccept for Stmt {
             Self::WhileStmt(x) => visitor.visit_whilestmt(x),
             Self::Function(x) => visitor.visit_function(x),
             Self::ReturnStmt(x) => visitor.visit_returnstmt(x),
+            Self::Class(x) => visitor.visit_class(x),
         }
     }
 }

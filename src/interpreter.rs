@@ -21,6 +21,7 @@ pub enum LoxValue {
     String(String),
     Function(Function),
     NativeFunction(NativeFunction),
+    Class(Class),
 }
 
 impl LoxValue {
@@ -42,6 +43,7 @@ impl Display for LoxValue {
             Self::Number(x) => write!(f, "{}", x.to_string().trim_end_matches(".0")),
             Self::Function(fun) => write!(f, "{:?}", fun),
             Self::NativeFunction(nfun) => write!(f, "{:?}", nfun),
+            Self::Class(c) => write!(f, "{:?}", c),
         }
     }
 }
@@ -171,6 +173,17 @@ impl PartialEq for Function {
 
     fn ne(&self, other: &Self) -> bool {
         !self.eq(other)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Class {
+    name: String,
+}
+
+impl Class {
+    pub fn new(name: String) -> Self {
+        Self { name }
     }
 }
 
@@ -560,5 +573,25 @@ impl StmtVisitor for Interpreter {
         };
 
         Err(Box::new(ReturnError::new(value)))
+    }
+
+    fn visit_class(&mut self, class: &crate::ast::Class) -> Self::Result {
+        let name = match class.name.kind() {
+            TokenKind::Identifier(id) => id.clone(),
+            _ => {
+                return Err(Box::new(RuntimeError::new(
+                    class.name.clone(),
+                    "Expected identifier".to_string(),
+                )))
+            }
+        };
+
+        self.environment
+            .borrow_mut()
+            .define(name.clone(), LoxValue::Nil);
+        let klass = LoxValue::Class(Class::new(name.clone()));
+        self.environment.borrow_mut().assign(&class.name, klass);
+
+        Ok(())
     }
 }

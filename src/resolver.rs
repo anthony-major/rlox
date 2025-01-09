@@ -215,4 +215,9 @@ impl StmtVisitor for Resolver {
         whilestmt.condition.accept(self);
         whilestmt.body.accept(self);
     }
+
+    fn visit_class(&mut self, class: &crate::ast::Class) -> Self::Result {
+        self.declare(&class.name);
+        self.define(&class.name);
+    }
 }

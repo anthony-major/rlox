@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Assign, Binary, Block, Call, Expr, Expression, Function, Grouping, IfStmt, Literal,
+        Assign, Binary, Block, Call, Class, Expr, Expression, Function, Grouping, IfStmt, Literal,
         Logical, Print, ReturnStmt, Stmt, Unary, Var, Variable, WhileStmt,
     },
     interpreter::RuntimeError,
@@ -130,6 +130,17 @@ impl Parser {
                     }
                 }
             }
+            TokenKind::Class => {
+                self.current_token = self.scanner.get_next_token()?;
+
+                match self.class_declaration() {
+                    Ok(statement) => return Ok(statement),
+                    Err(err) => {
+                        self.synchronize()?;
+                        return Err(err);
+                    }
+                }
+            }
             _ => {}
         }
 
@@ -248,6 +259,49 @@ impl Parser {
         let body = self.block()?;
 
         Ok(Stmt::Function(Function::new(name, parameters, body)))
+    }
+
+    fn class_declaration(&mut self) -> ParserResult<Stmt> {
+        let name = match self.current_token.kind() {
+            TokenKind::Identifier(_) => self.current_token.clone(),
+            _ => {
+                return Err(Box::new(ParserError::new(
+                    self.current_token.clone(),
+                    "Expect class name".to_string(),
+                )))
+            }
+        };
+        self.current_token = self.scanner.get_next_token()?;
+
+        if !matches!(self.current_token.kind(), TokenKind::LeftBrace) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect '{' before class body.".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        let mut methods: Vec<Function> = Vec::new();
+        while !matches!(
+            self.current_token.kind(),
+            TokenKind::RightBrace | TokenKind::Eof
+        ) {
+            let function_statement = self.function(FunctionKind::Function)?;
+
+            if let Stmt::Function(function) = function_statement {
+                methods.push(function);
+            }
+        }
+
+        if !matches!(self.current_token.kind(), TokenKind::RightBrace) {
+            return Err(Box::new(ParserError::new(
+                self.current_token.clone(),
+                "Expect '}' after class body".to_string(),
+            )));
+        }
+        self.current_token = self.scanner.get_next_token()?;
+
+        Ok(Stmt::Class(Class::new(name, methods)))
     }
 
     fn statement(&mut self) -> ParserResult<Stmt> {
