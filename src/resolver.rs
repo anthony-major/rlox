@@ -1,23 +1,37 @@
-use std::{borrow::BorrowMut, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    ast::{Expr, ExprAccept, ExprVisitor, StmtAccept, StmtVisitor},
+    ast::{Expr, ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
     interpreter::Interpreter,
     lox::Lox,
     parser::ParserError,
     token::{Token, TokenKind},
 };
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum FunctionKind {
+    None,
+    Function,
+}
+
 pub struct Resolver {
-    interpreter: Rc<Interpreter>,
+    interpreter: Rc<RefCell<Interpreter>>,
     scopes: Vec<HashMap<String, bool>>,
+    current_function: FunctionKind,
 }
 
 impl Resolver {
-    pub fn new(interpreter: Rc<Interpreter>) -> Self {
+    pub fn new(interpreter: Rc<RefCell<Interpreter>>) -> Self {
         Self {
             interpreter,
             scopes: Vec::new(),
+            current_function: FunctionKind::None,
+        }
+    }
+
+    pub fn resolve(&mut self, statements: &Vec<Stmt>) {
+        for statement in statements {
+            statement.accept(self);
         }
     }
 
@@ -28,6 +42,13 @@ impl Resolver {
 
         let scope = self.scopes.last_mut().unwrap();
         if let TokenKind::Identifier(id) = name.kind() {
+            if scope.contains_key(id) {
+                Lox::error(Box::new(ParserError::new(
+                    name.clone(),
+                    "Already a variable with this name in this scope.".to_string(),
+                )));
+            }
+
             scope.insert(id.clone(), false);
         }
     }
@@ -55,6 +76,26 @@ impl Resolver {
             }
         }
     }
+
+    fn resolve_function(&mut self, function: &crate::ast::Function, kind: FunctionKind) {
+        let enclosing_function = self.current_function.clone();
+        self.current_function = kind;
+
+        self.scopes.push(HashMap::new());
+
+        for parameter in &function.params {
+            self.declare(parameter);
+            self.define(parameter);
+        }
+
+        for statement in &function.body {
+            statement.accept(self);
+        }
+
+        self.scopes.pop();
+
+        self.current_function = enclosing_function;
+    }
 }
 
 impl ExprVisitor for Resolver {
@@ -81,6 +122,34 @@ impl ExprVisitor for Resolver {
         assign.value.accept(self);
         self.resolve_local(&Expr::Assign(assign.clone()), &assign.name);
     }
+
+    fn visit_binary(&mut self, binary: &crate::ast::Binary) -> Self::Result {
+        binary.left.accept(self);
+        binary.right.accept(self);
+    }
+
+    fn visit_call(&mut self, call: &crate::ast::Call) -> Self::Result {
+        call.callee.accept(self);
+
+        for argument in &call.arguments {
+            argument.accept(self);
+        }
+    }
+
+    fn visit_grouping(&mut self, grouping: &crate::ast::Grouping) -> Self::Result {
+        grouping.expression.accept(self);
+    }
+
+    fn visit_literal(&mut self, _literal: &crate::ast::Literal) -> Self::Result {}
+
+    fn visit_logical(&mut self, logical: &crate::ast::Logical) -> Self::Result {
+        logical.left.accept(self);
+        logical.right.accept(self);
+    }
+
+    fn visit_unary(&mut self, unary: &crate::ast::Unary) -> Self::Result {
+        unary.right.accept(self);
+    }
 }
 
 impl StmtVisitor for Resolver {
@@ -99,10 +168,51 @@ impl StmtVisitor for Resolver {
     fn visit_var(&mut self, var: &crate::ast::Var) -> Self::Result {
         self.declare(&var.name);
 
-        if let Some(initializer) = var.initializer {
+        if let Some(initializer) = &var.initializer {
             initializer.accept(self);
         }
 
         self.define(&var.name);
+    }
+
+    fn visit_function(&mut self, function: &crate::ast::Function) -> Self::Result {
+        self.declare(&function.name);
+        self.define(&function.name);
+
+        self.resolve_function(function, FunctionKind::Function);
+    }
+
+    fn visit_expression(&mut self, expression: &crate::ast::Expression) -> Self::Result {
+        expression.expression.accept(self);
+    }
+
+    fn visit_ifstmt(&mut self, ifstmt: &crate::ast::IfStmt) -> Self::Result {
+        ifstmt.condition.accept(self);
+        ifstmt.then_branch.accept(self);
+        if let Some(branch) = &ifstmt.else_branch {
+            branch.accept(self);
+        }
+    }
+
+    fn visit_print(&mut self, print: &crate::ast::Print) -> Self::Result {
+        print.expression.accept(self);
+    }
+
+    fn visit_returnstmt(&mut self, returnstmt: &crate::ast::ReturnStmt) -> Self::Result {
+        if self.current_function == FunctionKind::None {
+            Lox::error(Box::new(ParserError::new(
+                returnstmt.keyword.clone(),
+                "Can't return from top-level code.".to_string(),
+            )))
+        }
+
+        if let Some(value) = &returnstmt.value {
+            value.accept(self);
+        }
+    }
+
+    fn visit_whilestmt(&mut self, whilestmt: &crate::ast::WhileStmt) -> Self::Result {
+        whilestmt.condition.accept(self);
+        whilestmt.body.accept(self);
     }
 }

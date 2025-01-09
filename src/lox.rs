@@ -1,13 +1,15 @@
 use std::{
+    cell::RefCell,
     error::Error,
     io::{stdin, stdout, Result, Write},
+    rc::Rc,
 };
 
-use crate::{interpreter::Interpreter, parser::Parser, scanner::Scanner};
+use crate::{interpreter::Interpreter, parser::Parser, resolver::Resolver, scanner::Scanner};
 
 #[derive(Default)]
 pub struct Lox {
-    interpreter: Interpreter,
+    interpreter: Rc<RefCell<Interpreter>>,
 }
 
 impl Lox {
@@ -47,10 +49,15 @@ impl Lox {
         // let mut errors: Vec<Box<dyn Error>> = Vec::new();
 
         match parser.parse() {
-            Ok(statements) => match self.interpreter.interpret(statements) {
-                Ok(_) => {}
-                Err(err) => println!("{}", err),
-            },
+            Ok(statements) => {
+                let mut resolver = Resolver::new(self.interpreter.clone());
+                resolver.resolve(&statements);
+
+                match self.interpreter.borrow_mut().interpret(statements) {
+                    Ok(_) => {}
+                    Err(err) => println!("{}", err),
+                }
+            }
             Err(err) => println!("{}", err),
         }
     }

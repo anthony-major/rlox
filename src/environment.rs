@@ -5,7 +5,7 @@ use crate::{
     token::{Token, TokenKind},
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Environment {
     values: HashMap<String, LoxValue>,
     enclosing: Option<Rc<RefCell<Environment>>>,
@@ -43,6 +43,15 @@ impl Environment {
         }
     }
 
+    pub fn get_at(&mut self, distance: usize, name: &Token) -> Result<LoxValue, Box<dyn Error>> {
+        let mut environment = Rc::new(RefCell::new(self.clone()));
+        for _ in 0..distance {
+            environment = environment.clone().borrow_mut().enclosing.clone().unwrap();
+        }
+
+        environment.clone().borrow_mut().get(name)
+    }
+
     pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<LoxValue, Box<dyn Error>> {
         if let TokenKind::Identifier(id) = name.kind() {
             if self.values.contains_key(id) {
@@ -63,5 +72,19 @@ impl Environment {
                 "Expected identifier to be passed to environment assign".to_string(),
             )))
         }
+    }
+
+    pub fn assign_at(
+        &mut self,
+        distance: usize,
+        name: &Token,
+        value: LoxValue,
+    ) -> Result<LoxValue, Box<dyn Error>> {
+        let mut environment = Rc::new(RefCell::new(self.clone()));
+        for _ in 0..distance {
+            environment = environment.clone().borrow_mut().enclosing.clone().unwrap();
+        }
+
+        environment.clone().borrow_mut().assign(name, value.clone())
     }
 }

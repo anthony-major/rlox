@@ -33,7 +33,7 @@ for base in ast.keys():
     nodes = ast[base]
 
     # Create enum
-    add_line("#[derive(Debug, Clone)]")
+    add_line("#[derive(Debug, Clone, Eq, Hash, PartialEq)]")
     add_line(f"pub enum {base} {{")
     for node in nodes:
         name = node.split(":")[0]
@@ -47,7 +47,7 @@ for base in ast.keys():
         name = node.split(":")[0]
         fields = node.split(":")[1].split(",")
 
-        add_line("#[derive(Debug, Clone)]")
+        add_line("#[derive(Debug, Clone, Eq, Hash, PartialEq)]")
         add_line(f"pub struct {name} {{")
         for field in fields:
             field_type, field_name = field.split()

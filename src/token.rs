@@ -1,6 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, hash::Hash};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Token {
     kind: TokenKind,
     line: usize,
@@ -78,6 +78,17 @@ pub enum TokenKind {
     While,
 
     Eof,
+}
+
+impl Eq for TokenKind {}
+
+impl Hash for TokenKind {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Number(x) => (*x as u64).hash(state),
+            _ => std::mem::discriminant(self).hash(state),
+        }
+    }
 }
 
 impl Display for TokenKind {

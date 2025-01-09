@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
     rc::Rc,
@@ -7,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    ast::{ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
+    ast::{Expr, ExprAccept, ExprVisitor, Stmt, StmtAccept, StmtVisitor},
     environment::Environment,
     token::{Token, TokenKind},
 };
@@ -222,6 +223,7 @@ impl Display for ReturnError {
 pub struct Interpreter {
     environment: Rc<RefCell<Environment>>,
     globals: Rc<RefCell<Environment>>,
+    locals: HashMap<Expr, usize>,
 }
 
 impl Default for Interpreter {
@@ -245,6 +247,7 @@ impl Default for Interpreter {
         Self {
             environment: environment.clone(),
             globals: environment.clone(),
+            locals: HashMap::new(),
         }
     }
 }
@@ -256,6 +259,19 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.clone(), depth);
+    }
+
+    fn look_up_variable(&mut self, name: &Token, expr: &Expr) -> Result<LoxValue, Box<dyn Error>> {
+        let distance = self.locals.get(expr);
+
+        match distance {
+            Some(distance) => self.environment.borrow_mut().get_at(*distance, name),
+            None => self.globals.borrow_mut().get(name),
+        }
     }
 }
 
@@ -372,15 +388,25 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_variable(&mut self, variable: &crate::ast::Variable) -> Self::Result {
-        match self.environment.borrow_mut().get(&variable.name) {
-            Ok(value) => Ok(value.clone()),
-            Err(err) => Err(err),
-        }
+        self.look_up_variable(&variable.name, &Expr::Variable(variable.clone()))
+        // match self.environment.borrow_mut().get(&variable.name) {
+        //     Ok(value) => Ok(value.clone()),
+        //     Err(err) => Err(err),
+        // }
     }
 
     fn visit_assign(&mut self, assign: &crate::ast::Assign) -> Self::Result {
         let value = assign.value.accept(self)?;
-        self.environment.borrow_mut().assign(&assign.name, value)
+
+        let distance = self.locals.get(&Expr::Assign(assign.clone()));
+        match distance {
+            Some(distance) => {
+                self.environment
+                    .borrow_mut()
+                    .assign_at(*distance, &assign.name, value)
+            }
+            None => self.globals.borrow_mut().assign(&assign.name, value),
+        }
     }
 
     fn visit_logical(&mut self, logical: &crate::ast::Logical) -> Self::Result {
