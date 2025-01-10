@@ -164,7 +164,7 @@ impl LoxCallable for Function {
 
 impl Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "Function: {{ {:?}, closure }}", self.declaration)
     }
 }
 
@@ -181,11 +181,16 @@ impl PartialEq for Function {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
     name: String,
+    methods: HashMap<String, Function>,
 }
 
 impl Class {
-    pub fn new(name: String) -> Self {
-        Self { name }
+    pub fn new(name: String, methods: HashMap<String, Function>) -> Self {
+        Self { name, methods }
+    }
+
+    pub fn find_method(&self, name: &String) -> Option<&Function> {
+        self.methods.get(name)
     }
 }
 
@@ -229,14 +234,19 @@ impl Instance {
             }
         };
 
-        if !self.fields.contains_key(id) {
-            return Err(Box::new(RuntimeError::new(
-                name.clone(),
-                format!("Undefined property '{}'", id),
-            )));
+        if self.fields.contains_key(id) {
+            return Ok(self.fields.get(id).unwrap().clone());
         }
 
-        Ok(self.fields.get(id).unwrap().clone())
+        let method = self.class.find_method(id);
+        if let Some(method) = method {
+            return Ok(LoxValue::Function(method.clone()));
+        }
+
+        return Err(Box::new(RuntimeError::new(
+            name.clone(),
+            format!("Undefined property '{}'", id),
+        )));
     }
 
     pub fn set(&mut self, name: &Token, value: LoxValue) {
@@ -678,8 +688,17 @@ impl StmtVisitor for Interpreter {
         self.environment
             .borrow_mut()
             .define(name.clone(), LoxValue::Nil);
-        let klass = LoxValue::Class(Class::new(name.clone()));
-        self.environment.borrow_mut().assign(&class.name, klass);
+
+        let mut methods: HashMap<String, Function> = HashMap::new();
+        for method in &class.methods {
+            let function = Function::new(method.clone(), self.environment.clone());
+            if let TokenKind::Identifier(name) = method.name.kind() {
+                methods.insert(name.clone(), function);
+            }
+        }
+
+        let klass = LoxValue::Class(Class::new(name.clone(), methods));
+        self.environment.borrow_mut().assign(&class.name, klass)?;
 
         Ok(())
     }

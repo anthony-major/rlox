@@ -12,6 +12,7 @@ use crate::{
 pub enum FunctionKind {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver {
@@ -227,6 +228,11 @@ impl StmtVisitor for Resolver {
 
     fn visit_class(&mut self, class: &crate::ast::Class) -> Self::Result {
         self.declare(&class.name);
+
+        for method in &class.methods {
+            self.resolve_function(method, FunctionKind::Method);
+        }
+
         self.define(&class.name);
     }
 }
