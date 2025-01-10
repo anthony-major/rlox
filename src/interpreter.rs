@@ -22,6 +22,7 @@ pub enum LoxValue {
     Function(Function),
     NativeFunction(NativeFunction),
     Class(Class),
+    Instance(Instance),
 }
 
 impl LoxValue {
@@ -44,6 +45,7 @@ impl Display for LoxValue {
             Self::Function(fun) => write!(f, "{:?}", fun),
             Self::NativeFunction(nfun) => write!(f, "{:?}", nfun),
             Self::Class(c) => write!(f, "{:?}", c),
+            Self::Instance(i) => write!(f, "{:?}", i),
         }
     }
 }
@@ -184,6 +186,66 @@ pub struct Class {
 impl Class {
     pub fn new(name: String) -> Self {
         Self { name }
+    }
+}
+
+impl LoxCallable for Class {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(
+        &self,
+        _interpreter: &mut Interpreter,
+        _arguments: Vec<LoxValue>,
+    ) -> Result<LoxValue, Box<dyn Error>> {
+        let instance = Instance::new(self.clone());
+        Ok(LoxValue::Instance(instance))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Instance {
+    class: Class,
+    fields: HashMap<String, LoxValue>,
+}
+
+impl Instance {
+    pub fn new(class: Class) -> Self {
+        Self {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, name: &Token) -> Result<LoxValue, Box<dyn Error>> {
+        let id = match name.kind() {
+            TokenKind::Identifier(id) => id,
+            _ => {
+                return Err(Box::new(RuntimeError::new(
+                    name.clone(),
+                    "Expected identifier".to_string(),
+                )))
+            }
+        };
+
+        if !self.fields.contains_key(id) {
+            return Err(Box::new(RuntimeError::new(
+                name.clone(),
+                format!("Undefined property '{}'", id),
+            )));
+        }
+
+        Ok(self.fields.get(id).unwrap().clone())
+    }
+
+    pub fn set(&mut self, name: &Token, value: LoxValue) {
+        let id = match name.kind() {
+            TokenKind::Identifier(id) => id.clone(),
+            _ => return,
+        };
+
+        self.fields.insert(id, value);
     }
 }
 
@@ -458,6 +520,7 @@ impl ExprVisitor for Interpreter {
         let function: Box<dyn LoxCallable> = match callee {
             LoxValue::NativeFunction(nfun) => Box::new(nfun),
             LoxValue::Function(fun) => Box::new(fun),
+            LoxValue::Class(class) => Box::new(class),
             _ => {
                 return Err(Box::new(RuntimeError::new(
                     call.paren.clone(),
@@ -478,6 +541,32 @@ impl ExprVisitor for Interpreter {
         }
 
         function.call(self, arguments)
+    }
+
+    fn visit_get(&mut self, get: &crate::ast::Get) -> Self::Result {
+        let object = get.object.accept(self)?;
+        match object {
+            LoxValue::Instance(instance) => instance.get(&get.name),
+            _ => Err(Box::new(RuntimeError::new(
+                get.name.clone(),
+                "Only instances have properties".to_string(),
+            ))),
+        }
+    }
+
+    fn visit_set(&mut self, set: &crate::ast::Set) -> Self::Result {
+        let object = set.object.accept(self)?;
+        match object {
+            LoxValue::Instance(mut instance) => {
+                let value = set.value.accept(self)?;
+                instance.set(&set.name, value.clone());
+                Ok(value)
+            }
+            _ => Err(Box::new(RuntimeError::new(
+                set.name.clone(),
+                "Only instances have fields".to_string(),
+            ))),
+        }
     }
 }
 

@@ -10,6 +10,8 @@ pub enum Expr {
     Assign(Assign),
     Logical(Logical),
     Call(Call),
+    Get(Get),
+    Set(Set),
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -51,7 +53,9 @@ pub struct Literal {
 
 impl Literal {
     pub fn new(value: Token) -> Self {
-        Self { value: value }
+        Self {
+            value: value,
+        }
     }
 }
 
@@ -75,7 +79,9 @@ pub struct Variable {
 
 impl Variable {
     pub fn new(name: Token) -> Self {
-        Self { name: name }
+        Self {
+            name: name,
+        }
     }
 }
 
@@ -128,6 +134,38 @@ impl Call {
     }
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct Get {
+    pub object: Box<Expr>,
+    pub name: Token,
+}
+
+impl Get {
+    pub fn new(object: Box<Expr>, name: Token) -> Self {
+        Self {
+            object: object,
+            name: name,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct Set {
+    pub object: Box<Expr>,
+    pub name: Token,
+    pub value: Box<Expr>,
+}
+
+impl Set {
+    pub fn new(object: Box<Expr>, name: Token, value: Box<Expr>) -> Self {
+        Self {
+            object: object,
+            name: name,
+            value: value,
+        }
+    }
+}
+
 pub trait ExprVisitor {
     type Result;
 
@@ -139,6 +177,8 @@ pub trait ExprVisitor {
     fn visit_assign(&mut self, assign: &Assign) -> Self::Result;
     fn visit_logical(&mut self, logical: &Logical) -> Self::Result;
     fn visit_call(&mut self, call: &Call) -> Self::Result;
+    fn visit_get(&mut self, get: &Get) -> Self::Result;
+    fn visit_set(&mut self, set: &Set) -> Self::Result;
 }
 
 pub trait ExprAccept {
@@ -156,6 +196,8 @@ impl ExprAccept for Expr {
             Self::Assign(x) => visitor.visit_assign(x),
             Self::Logical(x) => visitor.visit_logical(x),
             Self::Call(x) => visitor.visit_call(x),
+            Self::Get(x) => visitor.visit_get(x),
+            Self::Set(x) => visitor.visit_set(x),
         }
     }
 }
@@ -234,11 +276,7 @@ pub struct IfStmt {
 }
 
 impl IfStmt {
-    pub fn new(
-        condition: Box<Expr>,
-        then_branch: Box<Stmt>,
-        else_branch: Option<Box<Stmt>>,
-    ) -> Self {
+    pub fn new(condition: Box<Expr>, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>>) -> Self {
         Self {
             condition: condition,
             then_branch: then_branch,

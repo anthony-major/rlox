@@ -2,8 +2,8 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     ast::{
-        Assign, Binary, Block, Call, Class, Expr, Expression, Function, Grouping, IfStmt, Literal,
-        Logical, Print, ReturnStmt, Stmt, Unary, Var, Variable, WhileStmt,
+        Assign, Binary, Block, Call, Class, Expr, Expression, Function, Get, Grouping, IfStmt,
+        Literal, Logical, Print, ReturnStmt, Set, Stmt, Unary, Var, Variable, WhileStmt,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -562,6 +562,9 @@ impl Parser {
 
                         Ok(Expr::Assign(Assign::new(name, Box::new(value))))
                     }
+                    Expr::Get(get) => {
+                        Ok(Expr::Set(Set::new(get.object, get.name, Box::new(value))))
+                    }
                     _ => {
                         Lox::error(Box::new(RuntimeError::new(
                             equals,
@@ -687,6 +690,21 @@ impl Parser {
                 TokenKind::LeftParen => {
                     self.current_token = self.scanner.get_next_token()?;
                     expr = self.finish_call(expr)?;
+                }
+                TokenKind::Dot => {
+                    self.current_token = self.scanner.get_next_token()?;
+                    match self.current_token.kind() {
+                        TokenKind::Identifier(_) => {
+                            expr = Expr::Get(Get::new(Box::new(expr), self.current_token.clone()))
+                        }
+                        _ => {
+                            return Err(Box::new(ParserError::new(
+                                self.current_token.clone(),
+                                "Expect property name after '.'".to_string(),
+                            )))
+                        }
+                    }
+                    self.current_token = self.scanner.get_next_token()?;
                 }
                 _ => break,
             }

@@ -150,6 +150,15 @@ impl ExprVisitor for Resolver {
     fn visit_unary(&mut self, unary: &crate::ast::Unary) -> Self::Result {
         unary.right.accept(self);
     }
+
+    fn visit_get(&mut self, get: &crate::ast::Get) -> Self::Result {
+        get.object.accept(self);
+    }
+
+    fn visit_set(&mut self, set: &crate::ast::Set) -> Self::Result {
+        set.value.accept(self);
+        set.object.accept(self);
+    }
 }
 
 impl StmtVisitor for Resolver {
