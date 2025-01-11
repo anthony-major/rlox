@@ -15,10 +15,17 @@ pub enum FunctionKind {
     Method,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ClassKind {
+    None,
+    Class,
+}
+
 pub struct Resolver {
     interpreter: Rc<RefCell<Interpreter>>,
     scopes: Vec<HashMap<String, bool>>,
     current_function: FunctionKind,
+    current_class: ClassKind,
 }
 
 impl Resolver {
@@ -27,6 +34,7 @@ impl Resolver {
             interpreter,
             scopes: Vec::new(),
             current_function: FunctionKind::None,
+            current_class: ClassKind::None,
         }
     }
 
@@ -160,6 +168,24 @@ impl ExprVisitor for Resolver {
         set.value.accept(self);
         set.object.accept(self);
     }
+
+    fn visit_this(&mut self, this: &crate::ast::This) -> Self::Result {
+        if self.current_class == ClassKind::None {
+            Lox::error(Box::new(ParserError::new(
+                this.keyword.clone(),
+                "Can't use 'this' outside of a class.".to_string(),
+            )));
+            return;
+        }
+
+        self.resolve_local(
+            &Expr::This(this.clone()),
+            &Token::new(
+                TokenKind::Identifier("this".to_string()),
+                this.keyword.line().clone(),
+            ),
+        );
+    }
 }
 
 impl StmtVisitor for Resolver {
@@ -227,12 +253,24 @@ impl StmtVisitor for Resolver {
     }
 
     fn visit_class(&mut self, class: &crate::ast::Class) -> Self::Result {
+        let enclosing_class = self.current_class.clone();
+        self.current_class = ClassKind::Class;
+
         self.declare(&class.name);
+        self.define(&class.name);
+
+        self.scopes.push(HashMap::new());
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .insert("this".to_string(), true);
 
         for method in &class.methods {
             self.resolve_function(method, FunctionKind::Method);
         }
 
-        self.define(&class.name);
+        self.scopes.pop();
+
+        self.current_class = enclosing_class;
     }
 }

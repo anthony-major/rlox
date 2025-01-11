@@ -10,6 +10,7 @@ ast = {
         "Call: Box<Expr> callee, Token paren, Vec<Expr> arguments",
         "Get: Box<Expr> object, Token name",
         "Set: Box<Expr> object, Token name, Box<Expr> value",
+        "This: Token keyword",
     ],
     "Stmt": [
         "Block: Vec<Stmt> statements",

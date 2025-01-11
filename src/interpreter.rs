@@ -22,7 +22,7 @@ pub enum LoxValue {
     Function(Function),
     NativeFunction(NativeFunction),
     Class(Class),
-    Instance(Instance),
+    Instance(Rc<RefCell<Instance>>),
 }
 
 impl LoxValue {
@@ -112,6 +112,15 @@ impl Function {
             declaration,
             closure,
         }
+    }
+
+    pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> LoxValue {
+        let mut environment = Environment::new(self.closure.clone());
+        environment.define("this".to_string(), LoxValue::Instance(instance));
+        LoxValue::Function(Function::new(
+            self.declaration.clone(),
+            Rc::new(RefCell::new(environment)),
+        ))
     }
 }
 
@@ -205,7 +214,7 @@ impl LoxCallable for Class {
         _arguments: Vec<LoxValue>,
     ) -> Result<LoxValue, Box<dyn Error>> {
         let instance = Instance::new(self.clone());
-        Ok(LoxValue::Instance(instance))
+        Ok(LoxValue::Instance(Rc::new(RefCell::new(instance))))
     }
 }
 
@@ -223,7 +232,11 @@ impl Instance {
         }
     }
 
-    pub fn get(&self, name: &Token) -> Result<LoxValue, Box<dyn Error>> {
+    pub fn get(
+        &self,
+        name: &Token,
+        instance: Rc<RefCell<Instance>>,
+    ) -> Result<LoxValue, Box<dyn Error>> {
         let id = match name.kind() {
             TokenKind::Identifier(id) => id,
             _ => {
@@ -240,7 +253,7 @@ impl Instance {
 
         let method = self.class.find_method(id);
         if let Some(method) = method {
-            return Ok(LoxValue::Function(method.clone()));
+            return Ok(method.bind(instance));
         }
 
         return Err(Box::new(RuntimeError::new(
@@ -556,7 +569,7 @@ impl ExprVisitor for Interpreter {
     fn visit_get(&mut self, get: &crate::ast::Get) -> Self::Result {
         let object = get.object.accept(self)?;
         match object {
-            LoxValue::Instance(instance) => instance.get(&get.name),
+            LoxValue::Instance(instance) => instance.borrow_mut().get(&get.name, instance.clone()),
             _ => Err(Box::new(RuntimeError::new(
                 get.name.clone(),
                 "Only instances have properties".to_string(),
@@ -567,9 +580,9 @@ impl ExprVisitor for Interpreter {
     fn visit_set(&mut self, set: &crate::ast::Set) -> Self::Result {
         let object = set.object.accept(self)?;
         match object {
-            LoxValue::Instance(mut instance) => {
+            LoxValue::Instance(instance) => {
                 let value = set.value.accept(self)?;
-                instance.set(&set.name, value.clone());
+                instance.borrow_mut().set(&set.name, value.clone());
                 Ok(value)
             }
             _ => Err(Box::new(RuntimeError::new(
@@ -577,6 +590,16 @@ impl ExprVisitor for Interpreter {
                 "Only instances have fields".to_string(),
             ))),
         }
+    }
+
+    fn visit_this(&mut self, this: &crate::ast::This) -> Self::Result {
+        self.look_up_variable(
+            &Token::new(
+                TokenKind::Identifier("this".to_string()),
+                this.keyword.line().clone(),
+            ),
+            &Expr::This(this.clone()),
+        )
     }
 }
 

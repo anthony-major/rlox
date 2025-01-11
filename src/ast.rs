@@ -12,6 +12,7 @@ pub enum Expr {
     Call(Call),
     Get(Get),
     Set(Set),
+    This(This),
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -166,6 +167,19 @@ impl Set {
     }
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct This {
+    pub keyword: Token,
+}
+
+impl This {
+    pub fn new(keyword: Token) -> Self {
+        Self {
+            keyword: keyword,
+        }
+    }
+}
+
 pub trait ExprVisitor {
     type Result;
 
@@ -179,6 +193,7 @@ pub trait ExprVisitor {
     fn visit_call(&mut self, call: &Call) -> Self::Result;
     fn visit_get(&mut self, get: &Get) -> Self::Result;
     fn visit_set(&mut self, set: &Set) -> Self::Result;
+    fn visit_this(&mut self, this: &This) -> Self::Result;
 }
 
 pub trait ExprAccept {
@@ -198,6 +213,7 @@ impl ExprAccept for Expr {
             Self::Call(x) => visitor.visit_call(x),
             Self::Get(x) => visitor.visit_get(x),
             Self::Set(x) => visitor.visit_set(x),
+            Self::This(x) => visitor.visit_this(x),
         }
     }
 }
