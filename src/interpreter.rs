@@ -104,13 +104,19 @@ impl PartialEq for NativeFunction {
 pub struct Function {
     declaration: crate::ast::Function,
     closure: Rc<RefCell<Environment>>,
+    is_initializer: bool,
 }
 
 impl Function {
-    pub fn new(declaration: crate::ast::Function, closure: Rc<RefCell<Environment>>) -> Self {
+    pub fn new(
+        declaration: crate::ast::Function,
+        closure: Rc<RefCell<Environment>>,
+        is_initializer: bool,
+    ) -> Self {
         Self {
             declaration,
             closure,
+            is_initializer,
         }
     }
 
@@ -120,6 +126,7 @@ impl Function {
         LoxValue::Function(Function::new(
             self.declaration.clone(),
             Rc::new(RefCell::new(environment)),
+            self.is_initializer,
         ))
     }
 }
@@ -158,6 +165,12 @@ impl LoxCallable for Function {
                     interpreter.environment = previous;
 
                     if let Some(return_err) = err.downcast_ref::<ReturnError>() {
+                        if self.is_initializer {
+                            return self.closure.borrow_mut().get_at(
+                                0,
+                                &Token::new(TokenKind::Identifier("this".to_string()), 0),
+                            );
+                        }
                         return Ok(return_err.value.clone());
                     }
 
@@ -167,6 +180,12 @@ impl LoxCallable for Function {
         }
 
         interpreter.environment = previous;
+        if self.is_initializer {
+            return self
+                .closure
+                .borrow_mut()
+                .get_at(0, &Token::new(TokenKind::Identifier("this".to_string()), 0));
+        }
         Ok(LoxValue::Nil)
     }
 }
@@ -205,16 +224,26 @@ impl Class {
 
 impl LoxCallable for Class {
     fn arity(&self) -> usize {
-        0
+        let initializer = self.find_method(&"init".to_string());
+        match initializer {
+            Some(initializer) => initializer.arity(),
+            None => 0,
+        }
     }
 
     fn call(
         &self,
-        _interpreter: &mut Interpreter,
-        _arguments: Vec<LoxValue>,
+        interpreter: &mut Interpreter,
+        arguments: Vec<LoxValue>,
     ) -> Result<LoxValue, Box<dyn Error>> {
-        let instance = Instance::new(self.clone());
-        Ok(LoxValue::Instance(Rc::new(RefCell::new(instance))))
+        let instance = Rc::new(RefCell::new(Instance::new(self.clone())));
+        let initializer = self.find_method(&"init".to_string());
+        if let Some(initializer) = initializer {
+            if let LoxValue::Function(fun) = initializer.bind(instance.clone()) {
+                let _ = fun.call(interpreter, arguments);
+            }
+        }
+        Ok(LoxValue::Instance(instance.clone()))
     }
 }
 
@@ -673,7 +702,11 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_function(&mut self, function: &crate::ast::Function) -> Self::Result {
-        let fun = LoxValue::Function(Function::new(function.clone(), self.environment.clone()));
+        let fun = LoxValue::Function(Function::new(
+            function.clone(),
+            self.environment.clone(),
+            false,
+        ));
 
         match function.name.kind() {
             TokenKind::Identifier(id) => self.environment.borrow_mut().define(id.clone(), fun),
@@ -714,7 +747,11 @@ impl StmtVisitor for Interpreter {
 
         let mut methods: HashMap<String, Function> = HashMap::new();
         for method in &class.methods {
-            let function = Function::new(method.clone(), self.environment.clone());
+            let is_initializer = match method.name.kind() {
+                TokenKind::Identifier(id) => id == "init",
+                _ => false,
+            };
+            let function = Function::new(method.clone(), self.environment.clone(), is_initializer);
             if let TokenKind::Identifier(name) = method.name.kind() {
                 methods.insert(name.clone(), function);
             }

@@ -12,6 +12,7 @@ use crate::{
 pub enum FunctionKind {
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -243,6 +244,12 @@ impl StmtVisitor for Resolver {
         }
 
         if let Some(value) = &returnstmt.value {
+            if self.current_function == FunctionKind::Initializer {
+                Lox::error(Box::new(ParserError::new(
+                    returnstmt.keyword.clone(),
+                    "Can't return a value from an initializer.".to_string(),
+                )));
+            }
             value.accept(self);
         }
     }
@@ -266,7 +273,17 @@ impl StmtVisitor for Resolver {
             .insert("this".to_string(), true);
 
         for method in &class.methods {
-            self.resolve_function(method, FunctionKind::Method);
+            let kind = match method.name.kind() {
+                TokenKind::Identifier(id) => {
+                    if id == "init" {
+                        FunctionKind::Initializer
+                    } else {
+                        FunctionKind::Method
+                    }
+                }
+                _ => FunctionKind::Method,
+            };
+            self.resolve_function(method, kind);
         }
 
         self.scopes.pop();
