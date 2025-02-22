@@ -209,16 +209,31 @@ impl PartialEq for Function {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
     name: String,
+    superclass: Option<Box<Class>>,
     methods: HashMap<String, Function>,
 }
 
 impl Class {
-    pub fn new(name: String, methods: HashMap<String, Function>) -> Self {
-        Self { name, methods }
+    pub fn new(
+        name: String,
+        superclass: Option<Box<Class>>,
+        methods: HashMap<String, Function>,
+    ) -> Self {
+        Self {
+            name,
+            superclass,
+            methods,
+        }
     }
 
     pub fn find_method(&self, name: &String) -> Option<&Function> {
-        self.methods.get(name)
+        match self.methods.get(name) {
+            Some(method) => Some(method),
+            None => match &self.superclass {
+                Some(superclass) => superclass.find_method(name),
+                None => None,
+            },
+        }
     }
 }
 
@@ -731,6 +746,26 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_class(&mut self, class: &crate::ast::Class) -> Self::Result {
+        let superclass = match &class.superclass {
+            Some(superclass) => {
+                let superclass_name = match *superclass.clone() {
+                    Expr::Variable(var) => var.name.clone(),
+                    _ => unreachable!(),
+                };
+                let superclass = superclass.accept(self)?;
+                match superclass {
+                    LoxValue::Class(class) => Some(Box::new(class)),
+                    _ => {
+                        return Err(Box::new(RuntimeError::new(
+                            superclass_name,
+                            "Superclass must be a class.".to_string(),
+                        )))
+                    }
+                }
+            }
+            None => None,
+        };
+
         let name = match class.name.kind() {
             TokenKind::Identifier(id) => id.clone(),
             _ => {
@@ -757,7 +792,7 @@ impl StmtVisitor for Interpreter {
             }
         }
 
-        let klass = LoxValue::Class(Class::new(name.clone(), methods));
+        let klass = LoxValue::Class(Class::new(name.clone(), superclass, methods));
         self.environment.borrow_mut().assign(&class.name, klass)?;
 
         Ok(())

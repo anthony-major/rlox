@@ -351,13 +351,15 @@ impl ReturnStmt {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Class {
     pub name: Token,
+    pub superclass: Option<Box<Expr>>,
     pub methods: Vec<Function>,
 }
 
 impl Class {
-    pub fn new(name: Token, methods: Vec<Function>) -> Self {
+    pub fn new(name: Token, superclass: Option<Box<Expr>>, methods: Vec<Function>) -> Self {
         Self {
             name: name,
+            superclass: superclass,
             methods: methods,
         }
     }

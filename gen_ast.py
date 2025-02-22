@@ -21,7 +21,7 @@ ast = {
         "WhileStmt: Box<Expr> condition, Box<Stmt> body",
         "Function: Token name, Vec<Token> params, Vec<Stmt> body",
         "ReturnStmt: Token keyword, Option<Box<Expr>> value",
-        "Class: Token name, Vec<Function> methods",
+        "Class: Token name, Option<Box<Expr>> superclass, Vec<Function> methods",
     ]
 }
 

@@ -266,6 +266,29 @@ impl StmtVisitor for Resolver {
         self.declare(&class.name);
         self.define(&class.name);
 
+        if let Some(superclass) = &class.superclass {
+            let class_name = match class.name.kind() {
+                TokenKind::Identifier(id) => id.clone(),
+                _ => "".to_string(),
+            };
+            match *superclass.clone() {
+                Expr::Variable(var) => match var.name.kind() {
+                    TokenKind::Identifier(id) => {
+                        if class_name == id.clone() {
+                            Lox::error(Box::new(ParserError::new(
+                                var.name.clone(),
+                                "A class can't inherit from itself.".to_string(),
+                            )));
+                        }
+                    }
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }
+
+            superclass.accept(self);
+        }
+
         self.scopes.push(HashMap::new());
         self.scopes
             .last_mut()

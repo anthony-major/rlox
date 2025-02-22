@@ -273,6 +273,24 @@ impl Parser {
         };
         self.current_token = self.scanner.get_next_token()?;
 
+        let superclass = match self.current_token.kind() {
+            TokenKind::Less => {
+                self.current_token = self.scanner.get_next_token()?;
+
+                if !matches!(self.current_token.kind(), TokenKind::Identifier(_)) {
+                    return Err(Box::new(ParserError::new(
+                        self.current_token.clone(),
+                        "Expect superclass name".to_string(),
+                    )));
+                }
+                let superclass_name = self.current_token.clone();
+                self.current_token = self.scanner.get_next_token()?;
+
+                Some(Box::new(Expr::Variable(Variable::new(superclass_name))))
+            }
+            _ => None,
+        };
+
         if !matches!(self.current_token.kind(), TokenKind::LeftBrace) {
             return Err(Box::new(ParserError::new(
                 self.current_token.clone(),
@@ -301,7 +319,7 @@ impl Parser {
         }
         self.current_token = self.scanner.get_next_token()?;
 
-        Ok(Stmt::Class(Class::new(name, methods)))
+        Ok(Stmt::Class(Class::new(name, superclass, methods)))
     }
 
     fn statement(&mut self) -> ParserResult<Stmt> {
