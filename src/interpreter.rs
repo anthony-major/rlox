@@ -647,7 +647,6 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_superexpr(&mut self, superexpr: &crate::ast::SuperExpr) -> Self::Result {
-        println!("{:?}", self.locals);
         let distance = self
             .locals
             .get(&Expr::SuperExpr(superexpr.clone()))

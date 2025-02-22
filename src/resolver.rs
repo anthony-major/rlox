@@ -20,6 +20,7 @@ pub enum FunctionKind {
 pub enum ClassKind {
     None,
     Class,
+    Subclass,
 }
 
 pub struct Resolver {
@@ -189,6 +190,18 @@ impl ExprVisitor for Resolver {
     }
 
     fn visit_superexpr(&mut self, superexpr: &crate::ast::SuperExpr) -> Self::Result {
+        if self.current_class == ClassKind::None {
+            Lox::error(Box::new(ParserError::new(
+                superexpr.keyword.clone(),
+                "Can't use 'super' outside of a class.".to_string(),
+            )))
+        } else if self.current_class == ClassKind::Class {
+            Lox::error(Box::new(ParserError::new(
+                superexpr.keyword.clone(),
+                "Can't use 'super' in a class with no superclass".to_string(),
+            )))
+        }
+
         self.resolve_local(
             &Expr::SuperExpr(superexpr.clone()),
             &Token::new(
@@ -296,6 +309,7 @@ impl StmtVisitor for Resolver {
                 _ => unreachable!(),
             }
 
+            self.current_class = ClassKind::Subclass;
             superclass.accept(self);
 
             self.scopes.push(HashMap::new());
