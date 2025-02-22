@@ -13,6 +13,7 @@ pub enum Expr {
     Get(Get),
     Set(Set),
     This(This),
+    SuperExpr(SuperExpr),
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -180,6 +181,21 @@ impl This {
     }
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct SuperExpr {
+    pub keyword: Token,
+    pub method: Token,
+}
+
+impl SuperExpr {
+    pub fn new(keyword: Token, method: Token) -> Self {
+        Self {
+            keyword: keyword,
+            method: method,
+        }
+    }
+}
+
 pub trait ExprVisitor {
     type Result;
 
@@ -194,6 +210,7 @@ pub trait ExprVisitor {
     fn visit_get(&mut self, get: &Get) -> Self::Result;
     fn visit_set(&mut self, set: &Set) -> Self::Result;
     fn visit_this(&mut self, this: &This) -> Self::Result;
+    fn visit_superexpr(&mut self, superexpr: &SuperExpr) -> Self::Result;
 }
 
 pub trait ExprAccept {
@@ -214,6 +231,7 @@ impl ExprAccept for Expr {
             Self::Get(x) => visitor.visit_get(x),
             Self::Set(x) => visitor.visit_set(x),
             Self::This(x) => visitor.visit_this(x),
+            Self::SuperExpr(x) => visitor.visit_superexpr(x),
         }
     }
 }

@@ -11,6 +11,7 @@ ast = {
         "Get: Box<Expr> object, Token name",
         "Set: Box<Expr> object, Token name, Box<Expr> value",
         "This: Token keyword",
+        "SuperExpr: Token keyword, Token method",
     ],
     "Stmt": [
         "Block: Vec<Stmt> statements",

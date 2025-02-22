@@ -3,7 +3,8 @@ use std::{error::Error, fmt::Display};
 use crate::{
     ast::{
         Assign, Binary, Block, Call, Class, Expr, Expression, Function, Get, Grouping, IfStmt,
-        Literal, Logical, Print, ReturnStmt, Set, Stmt, This, Unary, Var, Variable, WhileStmt,
+        Literal, Logical, Print, ReturnStmt, Set, Stmt, SuperExpr, This, Unary, Var, Variable,
+        WhileStmt,
     },
     interpreter::RuntimeError,
     lox::Lox,
@@ -796,6 +797,26 @@ impl Parser {
                 let temp = self.current_token.clone();
                 self.current_token = self.scanner.get_next_token()?;
                 Ok(Expr::This(This::new(temp)))
+            }
+            TokenKind::Super => {
+                let keyword = self.current_token.clone();
+                self.current_token = self.scanner.get_next_token()?;
+                if !matches!(self.current_token.kind(), TokenKind::Dot) {
+                    return Err(Box::new(ParserError::new(
+                        self.current_token.clone(),
+                        "Expect '.' after 'super'.".to_string(),
+                    )));
+                }
+                self.current_token = self.scanner.get_next_token()?;
+                if !matches!(self.current_token.kind(), TokenKind::Identifier(_)) {
+                    return Err(Box::new(ParserError::new(
+                        self.current_token.clone(),
+                        "Expect superclass method name.".to_string(),
+                    )));
+                }
+                let method = self.current_token.clone();
+                self.current_token = self.scanner.get_next_token()?;
+                Ok(Expr::SuperExpr(SuperExpr::new(keyword, method)))
             }
             _ => Err(Box::new(ParserError::new(
                 self.current_token.clone(),

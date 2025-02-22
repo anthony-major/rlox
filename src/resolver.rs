@@ -187,6 +187,16 @@ impl ExprVisitor for Resolver {
             ),
         );
     }
+
+    fn visit_superexpr(&mut self, superexpr: &crate::ast::SuperExpr) -> Self::Result {
+        self.resolve_local(
+            &Expr::SuperExpr(superexpr.clone()),
+            &Token::new(
+                TokenKind::Identifier("super".to_string()),
+                superexpr.keyword.line().clone(),
+            ),
+        );
+    }
 }
 
 impl StmtVisitor for Resolver {
@@ -287,6 +297,12 @@ impl StmtVisitor for Resolver {
             }
 
             superclass.accept(self);
+
+            self.scopes.push(HashMap::new());
+            self.scopes
+                .last_mut()
+                .unwrap()
+                .insert("super".to_string(), true);
         }
 
         self.scopes.push(HashMap::new());
@@ -310,6 +326,10 @@ impl StmtVisitor for Resolver {
         }
 
         self.scopes.pop();
+
+        if class.superclass.is_some() {
+            self.scopes.pop();
+        }
 
         self.current_class = enclosing_class;
     }

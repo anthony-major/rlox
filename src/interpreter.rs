@@ -645,6 +645,49 @@ impl ExprVisitor for Interpreter {
             &Expr::This(this.clone()),
         )
     }
+
+    fn visit_superexpr(&mut self, superexpr: &crate::ast::SuperExpr) -> Self::Result {
+        println!("{:?}", self.locals);
+        let distance = self
+            .locals
+            .get(&Expr::SuperExpr(superexpr.clone()))
+            .unwrap();
+        let superclass = self.environment.borrow_mut().get_at(
+            distance.clone(),
+            &Token::new(
+                TokenKind::Identifier("super".to_string()),
+                superexpr.keyword.line().clone(),
+            ),
+        )?;
+        let object = self.environment.borrow_mut().get_at(
+            distance - 1,
+            &Token::new(
+                TokenKind::Identifier("this".to_string()),
+                superexpr.keyword.line().clone(),
+            ),
+        )?;
+        let method_name = match superexpr.method.kind() {
+            TokenKind::Identifier(id) => id.clone(),
+            _ => unreachable!(),
+        };
+        let method = match &superclass {
+            LoxValue::Class(superclass) => superclass.find_method(&method_name),
+            _ => unreachable!(),
+        };
+
+        match method {
+            Some(method) => match object {
+                LoxValue::Instance(object) => Ok(method.bind(object)),
+                _ => unreachable!(),
+            },
+            None => {
+                return Err(Box::new(RuntimeError::new(
+                    superexpr.method.clone(),
+                    format!("Undefined property '{}'.", method_name),
+                )))
+            }
+        }
+    }
 }
 
 impl StmtVisitor for Interpreter {
@@ -780,6 +823,14 @@ impl StmtVisitor for Interpreter {
             .borrow_mut()
             .define(name.clone(), LoxValue::Nil);
 
+        let enclosing_environment = self.environment.clone();
+        if let Some(superclass) = &superclass {
+            self.environment = Rc::new(RefCell::new(Environment::new(self.environment.clone())));
+            self.environment
+                .borrow_mut()
+                .define("super".to_string(), LoxValue::Class(*superclass.clone()));
+        }
+
         let mut methods: HashMap<String, Function> = HashMap::new();
         for method in &class.methods {
             let is_initializer = match method.name.kind() {
@@ -794,6 +845,10 @@ impl StmtVisitor for Interpreter {
 
         let klass = LoxValue::Class(Class::new(name.clone(), superclass, methods));
         self.environment.borrow_mut().assign(&class.name, klass)?;
+
+        if class.superclass.is_some() {
+            self.environment = enclosing_environment;
+        }
 
         Ok(())
     }
